@@ -687,7 +687,6 @@ STATUS createSampleConfiguration(PCHAR channelName, SIGNALING_CHANNEL_ROLE_TYPE 
     pSampleConfiguration->channelInfo.channelRoleType = roleType;
     pSampleConfiguration->channelInfo.cachingPolicy = SIGNALING_API_CALL_CACHE_TYPE_NONE;
     pSampleConfiguration->channelInfo.cachingPeriod = SIGNALING_API_CALL_CACHE_TTL_SENTINEL_VALUE;
-    pSampleConfiguration->channelInfo.asyncIceServerConfig = FALSE;
     pSampleConfiguration->channelInfo.retry = TRUE;
     pSampleConfiguration->channelInfo.reconnect = TRUE;
     pSampleConfiguration->channelInfo.pCertPath = pSampleConfiguration->pCaCertPath;
@@ -738,10 +737,11 @@ STATUS logSignalingClientStats(PSignalingClientMetrics pSignalingClientMetrics)
     DLOGD("Number of runtime errors in the session: %d", pSignalingClientMetrics->signalingClientStats.numberOfRuntimeErrors);
     DLOGD("Signaling client uptime: %" PRIu64 " ms",
           (pSignalingClientMetrics->signalingClientStats.connectionDuration / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
-    // This gives the EMA of the signalingCreateChannel, signalingDescribeChannel, signalingGetChannelEndpoint and signalingDeleteChannel calls
+    // This gives the EMA of the signaling_channel_create, signaling_channel_describe, signaling_channel_getEndpoint and signaling_channel_delete
+    // calls
     DLOGD("Control Plane API call latency: %" PRIu64 " ms",
           (pSignalingClientMetrics->signalingClientStats.cpApiCallLatency / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
-    // This gives the EMA of the signalingGetIceConfig() call.
+    // This gives the EMA of the signaling_channel_getIceConfig() call.
     DLOGD("Data Plane API call latency: %" PRIu64 " ms",
           (pSignalingClientMetrics->signalingClientStats.dpApiCallLatency / HUNDREDS_OF_NANOS_IN_A_MILLISECOND));
 CleanUp:
