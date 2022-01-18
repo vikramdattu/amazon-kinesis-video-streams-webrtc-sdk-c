@@ -4,6 +4,8 @@
 #define LOG_CLASS "TurnConnection"
 #include "../Include_i.h"
 #include "endianness.h"
+#include "IceAgent.h"
+#include "TurnConnection.h"
 
 // intenal function prototype.
 PTurnPeer turnConnectionGetPeerWithIp(PTurnConnection pTurnConnection, PKvsIpAddress pKvsIpAddress);
@@ -103,7 +105,7 @@ STATUS freeTurnConnection(PTurnConnection* ppTurnConnection)
 
     // shutdown control channel
     if (pTurnConnection->pControlChannel) {
-        CHK_LOG_ERR(connectionListenerRemoveConnection(pTurnConnection->pConnectionListener, pTurnConnection->pControlChannel));
+        CHK_LOG_ERR(connection_listener_remove(pTurnConnection->pConnectionListener, pTurnConnection->pControlChannel));
         CHK_LOG_ERR(freeSocketConnection(&pTurnConnection->pControlChannel));
     }
 

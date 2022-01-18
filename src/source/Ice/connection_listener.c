@@ -1,10 +1,33 @@
-/**
- * Kinesis Video Producer ConnectionListener
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
  */
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 #define LOG_CLASS "ConnectionListener"
-#include "../Include_i.h"
 
-STATUS createConnectionListener(PConnectionListener* ppConnectionListener)
+#include <sys/socket.h>
+#include <netdb.h>
+
+#include "connection_listener.h"
+#include "IceAgent.h"
+#include "IceUtils.h"
+
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
+STATUS connection_listener_create(PConnectionListener* ppConnectionListener)
 {
     STATUS retStatus = STATUS_SUCCESS;
     UINT32 allocationSize = SIZEOF(ConnectionListener) + MAX_UDP_PACKET_SIZE;
@@ -29,7 +52,7 @@ STATUS createConnectionListener(PConnectionListener* ppConnectionListener)
 CleanUp:
 
     if (STATUS_FAILED(retStatus) && pConnectionListener != NULL) {
-        freeConnectionListener(&pConnectionListener);
+        connection_listener_free(&pConnectionListener);
         pConnectionListener = NULL;
     }
 
@@ -40,7 +63,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS freeConnectionListener(PConnectionListener* ppConnectionListener)
+STATUS connection_listener_free(PConnectionListener* ppConnectionListener)
 {
     STATUS retStatus = STATUS_SUCCESS;
     PConnectionListener pConnectionListener = NULL;
@@ -92,7 +115,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS connectionListenerAddConnection(PConnectionListener pConnectionListener, PSocketConnection pSocketConnection)
+STATUS connection_listener_add(PConnectionListener pConnectionListener, PSocketConnection pSocketConnection)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL locked = FALSE, iterate = TRUE;
@@ -133,7 +156,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS connectionListenerRemoveConnection(PConnectionListener pConnectionListener, PSocketConnection pSocketConnection)
+STATUS connection_listener_remove(PConnectionListener pConnectionListener, PSocketConnection pSocketConnection)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL locked = FALSE, iterate = TRUE;
@@ -168,7 +191,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS connectionListenerRemoveAllConnection(PConnectionListener pConnectionListener)
+STATUS connection_listener_removeAll(PConnectionListener pConnectionListener)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL locked = FALSE;
@@ -197,7 +220,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS connectionListenerStart(PConnectionListener pConnectionListener)
+STATUS connection_listener_start(PConnectionListener pConnectionListener)
 {
     STATUS retStatus = STATUS_SUCCESS;
     BOOL locked = FALSE;
@@ -210,7 +233,7 @@ STATUS connectionListenerStart(PConnectionListener pConnectionListener)
 
     CHK(!IS_VALID_TID_VALUE(pConnectionListener->receiveDataRoutine), retStatus);
     CHK_STATUS(THREAD_CREATE_EX(&pConnectionListener->receiveDataRoutine, CONN_LISTENER_THREAD_NAME, CONN_LISTENER_THREAD_SIZE,
-                                connectionListenerReceiveDataRoutine, (PVOID) pConnectionListener));
+                                connection_listener_receiveRoutine, (PVOID) pConnectionListener));
     CHK_STATUS(THREAD_DETACH(pConnectionListener->receiveDataRoutine));
 
 CleanUp:
@@ -222,7 +245,7 @@ CleanUp:
     return retStatus;
 }
 
-PVOID connectionListenerReceiveDataRoutine(PVOID arg)
+PVOID connection_listener_receiveRoutine(PVOID arg)
 {
     STATUS retStatus = STATUS_SUCCESS;
     PConnectionListener pConnectionListener = (PConnectionListener) arg;
@@ -385,6 +408,6 @@ CleanUp:
     }
 
     CHK_LOG_ERR(retStatus);
-
+    THREAD_EXIT(NULL);
     return (PVOID)(ULONG_PTR) retStatus;
 }

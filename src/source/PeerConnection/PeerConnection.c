@@ -2,6 +2,21 @@
 
 #include "../Include_i.h"
 #include "dtls.h"
+#include "connection_listener.h"
+#include "IceAgentStateMachine.h"
+#include "network.h"
+#include "RtcpPacket.h"
+#include "JitterBuffer.h"
+#include "PeerConnection.h"
+#include "SessionDescription.h"
+#include "Rtp.h"
+#include "Rtcp.h"
+#include "Sdp.h"
+#include "DataChannel.h"
+#include "RtpVP8Payloader.h"
+#include "RtpH264Payloader.h"
+#include "RtpOpusPayloader.h"
+#include "RtpG711Payloader.h"
 
 #define PC_ENTER()  // ENTER()
 #define PC_LEAVE()  // LEAVE()
@@ -786,7 +801,7 @@ STATUS createPeerConnection(PRtcConfiguration pConfiguration, PRtcPeerConnection
     iceAgentCallbacks.inboundPacketFn = onInboundPacket;
     iceAgentCallbacks.connectionStateChangedFn = onIceConnectionStateChange;
     iceAgentCallbacks.newLocalCandidateFn = onNewIceLocalCandidate;
-    CHK_STATUS(createConnectionListener(&pConnectionListener));
+    CHK_STATUS(connection_listener_create(&pConnectionListener));
     // IceAgent will own the lifecycle of pConnectionListener;
     CHK_STATUS(createIceAgent(pKvsPeerConnection->localIceUfrag, pKvsPeerConnection->localIcePwd, &iceAgentCallbacks, pConfiguration,
                               pKvsPeerConnection->timerQueueHandle, pConnectionListener, &pKvsPeerConnection->pIceAgent));
