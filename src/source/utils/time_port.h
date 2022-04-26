@@ -18,13 +18,67 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
+#include <time.h>
 #include "kvs/common_defs.h"
 #include "kvs/error.h"
+
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 // yyyy-mm-dd HH:MM:SS
-#define MAX_TIMESTAMP_FORMAT_STR_LEN 19
-//////////////////////////////////////////////////////////////////////////////////////////////////////
+#define MAX_TIMESTAMP_FORMAT_STR_LEN                             19
+#define KVS_CONVERT_TIMESCALE(pts, from_timescale, to_timescale) (pts * to_timescale / from_timescale)
+
+//
+// NOTE: Timer precision is in 100ns intervals. This is used in heuristics and in time functionality
+//
+#define DEFAULT_TIME_UNIT_IN_NANOS         100
+#define HUNDREDS_OF_NANOS_IN_A_MICROSECOND 10LL
+#define HUNDREDS_OF_NANOS_IN_A_MILLISECOND (HUNDREDS_OF_NANOS_IN_A_MICROSECOND * 1000LL)
+#define HUNDREDS_OF_NANOS_IN_A_SECOND      (HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 1000LL)
+#define HUNDREDS_OF_NANOS_IN_A_MINUTE      (HUNDREDS_OF_NANOS_IN_A_SECOND * 60LL)
+#define HUNDREDS_OF_NANOS_IN_AN_HOUR       (HUNDREDS_OF_NANOS_IN_A_MINUTE * 60LL)
+//
+// Infinite time
+//
+#define INFINITE_TIME_VALUE MAX_UINT64
+//
+// Default time library functions
+//
+#define TIME_DIFF_UNIX_WINDOWS_TIME 116444736000000000ULL
+/**
+ * Gets the current time in 100ns from some timestamp.
+ *
+ * @param 1 UINT64 - Custom handle passed by the caller.
+ *
+ * @return Current time value in 100ns
+ */
+typedef UINT64 (*GetCurrentTimeFunc)(UINT64);
+//
+// Time library function definitions
+//
+typedef UINT64 (*getTime)();
+//
+// Thread related functionality
+//
+extern getTime globalGetTime;
+extern getTime globalGetRealTime;
+
+//
 // Time functionality
-//////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+#define MKTIME      mktime
+#define GETTIME     globalGetTime
+#define GETREALTIME globalGetRealTime
+#define STRFTIME    strftime
+#define GMTIME      gmtime
+
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 /**
  * @UINT64  - IN - timestamp in 100ns to be converted to string
  * @PCHAR   - IN - timestamp format string
@@ -34,7 +88,7 @@ extern "C" {
  * @return  - STATUS code of the execution
  */
 STATUS generateTimestampStr(UINT64, PCHAR, PCHAR, UINT32, PUINT32);
-
+INLINE UINT64 defaultGetTime();
 #ifdef __cplusplus
 }
 #endif

@@ -1,23 +1,41 @@
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 #ifdef ENABLE_DATA_CHANNEL
 
 #define LOG_CLASS "DataChannel"
-
 #include "../Include_i.h"
 #include "PeerConnection.h"
-#include "Sctp.h"
+#include "sctp_session.h"
 #include "DataChannel.h"
 
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 #define DATA_ENTER()  // ENTER()
 #define DATA_LEAVE()  // LEAVE()
 #define DATA_ENTERS() // ENTERS()
 #define DATA_LEAVES() // LEAVES()
-STATUS connectLocalDataChannel()
-{
-    return STATUS_SUCCESS;
-}
 
-STATUS createDataChannel(PRtcPeerConnection pPeerConnection, PCHAR pDataChannelName, PRtcDataChannelInit pRtcDataChannelInit,
-                         PRtcDataChannel* ppRtcDataChannel)
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
+STATUS data_channel_create(PRtcPeerConnection pPeerConnection, PCHAR pDataChannelName, PRtcDataChannelInit pRtcDataChannelInit,
+                           PRtcDataChannel* ppRtcDataChannel)
 {
     DATA_ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -28,7 +46,7 @@ STATUS createDataChannel(PRtcPeerConnection pPeerConnection, PCHAR pDataChannelN
     CHK(pKvsPeerConnection != NULL && pDataChannelName != NULL && ppRtcDataChannel != NULL, STATUS_NULL_ARG);
 
     // Only support creating DataChannels before signaling for now
-    CHK(pKvsPeerConnection->pSctpSession == NULL, STATUS_PEERCONNECTION_NO_SCTP_SESSION);
+    CHK(pKvsPeerConnection->pSctpSession == NULL, STATUS_PEER_CONN_NO_SCTP_SESSION);
     CHK((pKvsDataChannel = (PKvsDataChannel) MEMCALLOC(1, SIZEOF(KvsDataChannel))) != NULL, STATUS_NOT_ENOUGH_MEMORY);
 
     STRNCPY(pKvsDataChannel->dataChannel.name, pDataChannelName, MAX_DATA_CHANNEL_NAME_LEN);
@@ -48,7 +66,7 @@ STATUS createDataChannel(PRtcPeerConnection pPeerConnection, PCHAR pDataChannelN
     STRNCPY(pKvsDataChannel->rtcDataChannelDiagnostics.label, pKvsDataChannel->dataChannel.name, STRLEN(pKvsDataChannel->dataChannel.name));
     pKvsDataChannel->rtcDataChannelDiagnostics.state = RTC_DATA_CHANNEL_STATE_CONNECTING;
 
-    CHK_STATUS(hashTableGetCount(pKvsPeerConnection->pDataChannels, &channelId));
+    CHK_STATUS(hash_table_getCount(pKvsPeerConnection->pDataChannels, &channelId));
 
     pKvsDataChannel->rtcDataChannelDiagnostics.dataChannelIdentifier = channelId;
     pKvsDataChannel->dataChannel.id = channelId;
@@ -56,7 +74,7 @@ STATUS createDataChannel(PRtcPeerConnection pPeerConnection, PCHAR pDataChannelN
     STRNCPY(pKvsDataChannel->rtcDataChannelDiagnostics.protocol, DATA_CHANNEL_PROTOCOL_STR,
             ARRAY_SIZE(pKvsDataChannel->rtcDataChannelDiagnostics.protocol));
 
-    CHK_STATUS(hashTablePut(pKvsPeerConnection->pDataChannels, channelId, (UINT64) pKvsDataChannel));
+    CHK_STATUS(hash_table_put(pKvsPeerConnection->pDataChannels, channelId, (UINT64) pKvsDataChannel));
 
 CleanUp:
     if (STATUS_SUCCEEDED(retStatus)) {
@@ -69,7 +87,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS dataChannelSend(PRtcDataChannel pRtcDataChannel, BOOL isBinary, PBYTE pMessage, UINT32 pMessageLen)
+STATUS data_channel_send(PRtcDataChannel pRtcDataChannel, BOOL isBinary, PBYTE pMessage, UINT32 pMessageLen)
 {
     STATUS retStatus = STATUS_SUCCESS;
     PSctpSession pSctpSession = NULL;
@@ -79,7 +97,7 @@ STATUS dataChannelSend(PRtcDataChannel pRtcDataChannel, BOOL isBinary, PBYTE pMe
 
     pSctpSession = ((PKvsPeerConnection) pKvsDataChannel->pRtcPeerConnection)->pSctpSession;
 
-    CHK_STATUS(sctpSessionWriteMessage(pSctpSession, pKvsDataChannel->channelId, isBinary, pMessage, pMessageLen));
+    CHK_STATUS(sctp_session_sendMsg(pSctpSession, pKvsDataChannel->channelId, isBinary, pMessage, pMessageLen));
 
     pKvsDataChannel->rtcDataChannelDiagnostics.messagesSent++;
     pKvsDataChannel->rtcDataChannelDiagnostics.bytesSent += pMessageLen;
@@ -88,7 +106,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS dataChannelOnMessage(PRtcDataChannel pRtcDataChannel, UINT64 customData, RtcOnMessage rtcOnMessage)
+STATUS data_channel_onMessage(PRtcDataChannel pRtcDataChannel, UINT64 customData, RtcOnMessage rtcOnMessage)
 {
     DATA_ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -105,7 +123,7 @@ CleanUp:
     return retStatus;
 }
 
-STATUS dataChannelOnOpen(PRtcDataChannel pRtcDataChannel, UINT64 customData, RtcOnOpen rtcOnOpen)
+STATUS data_channel_onOpen(PRtcDataChannel pRtcDataChannel, UINT64 customData, RtcOnOpen rtcOnOpen)
 {
     DATA_ENTERS();
     STATUS retStatus = STATUS_SUCCESS;

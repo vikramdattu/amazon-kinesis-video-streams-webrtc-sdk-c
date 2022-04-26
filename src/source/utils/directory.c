@@ -12,11 +12,21 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
+#include <dirent.h>
 #include "kvs/common_defs.h"
 #include "kvs/error.h"
-#include <kvs/platform_utils.h>
+#include "kvs/platform_utils.h"
 #include "directory.h"
 
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 /**
  * Traverses the directory iteratively
  *
@@ -26,7 +36,7 @@
  *      iterate - whether to iterate to sub-directories
  *      entryFn - callback function to call
  */
-STATUS traverseDirectory(PCHAR dirPath, UINT64 userData, BOOL iterate, DirectoryEntryCallbackFunc entryFn)
+STATUS directory_traverse(PCHAR dirPath, UINT64 userData, BOOL iterate, DirectoryEntryCallbackFunc entryFn)
 {
     STATUS retStatus = STATUS_SUCCESS;
     CHAR tempFileName[MAX_PATH_LEN];
@@ -86,7 +96,7 @@ STATUS traverseDirectory(PCHAR dirPath, UINT64 userData, BOOL iterate, Directory
                 DLOGE("\r\nDir Path %s, tempFile %s find %s\r\n", dirPath, tempFileName, findData.cFileName);
 
                 // Recurse into the directory
-                CHK_STATUS(traverseDirectory(tempFileName, userData, iterate, entryFn));
+                CHK_STATUS(directory_traverse(tempFileName, userData, iterate, entryFn));
             }
 
             // Call the callback
@@ -153,7 +163,7 @@ CleanUp:
                 tempFileName[dirPathLen + 1] = '\0';
 
                 // Recurse into the directory
-                CHK_STATUS(traverseDirectory(tempFileName, userData, iterate, entryFn));
+                CHK_STATUS(directory_traverse(tempFileName, userData, iterate, entryFn));
             }
 
             // Remove the path separator

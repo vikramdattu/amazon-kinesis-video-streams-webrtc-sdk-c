@@ -126,26 +126,26 @@ STATUS signAwsRequestInfo(PRequestInfo pRequestInfo)
     CHK_STATUS(getRequestHost(pRequestInfo->url, &pHostStart, &pHostEnd));
     len = (UINT32)(pHostEnd - pHostStart);
 
-    CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_HEADER_HOST, 0, pHostStart, len));
-    CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_HEADER_AMZ_DATE, 0, dateTimeStr, 0));
-    CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_CONTENT_TYPE_NAME, 0, AWS_SIG_V4_CONTENT_TYPE_VALUE, 0));
+    CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_HEADER_HOST, 0, pHostStart, len));
+    CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_HEADER_AMZ_DATE, 0, dateTimeStr, 0));
+    CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_CONTENT_TYPE_NAME, 0, AWS_SIG_V4_CONTENT_TYPE_VALUE, 0));
 
     // Set the content-length
     if (pRequestInfo->body != NULL) {
         CHK_STATUS(ULTOSTR(pRequestInfo->bodySize, contentLenBuf, SIZEOF(contentLenBuf), 10, NULL));
-        CHK_STATUS(setRequestHeader(pRequestInfo, (PCHAR) "content-length", 0, contentLenBuf, 0));
+        CHK_STATUS(request_header_set(pRequestInfo, (PCHAR) "content-length", 0, contentLenBuf, 0));
     }
 
     // Generate the signature
     CHK_STATUS(generateAwsSigV4Signature(pRequestInfo, dateTimeStr, TRUE, &pSignatureInfo, &len));
 
     // Set the header
-    CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_HEADER_AUTH, 0, pSignatureInfo, len));
+    CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_HEADER_AUTH, 0, pSignatureInfo, len));
 
     // Set the security token header if provided
     if (pRequestInfo->pAwsCredentials->sessionTokenLen != 0) {
-        CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_HEADER_AMZ_SECURITY_TOKEN, 0, pRequestInfo->pAwsCredentials->sessionToken,
-                                    pRequestInfo->pAwsCredentials->sessionTokenLen));
+        CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_HEADER_AMZ_SECURITY_TOKEN, 0, pRequestInfo->pAwsCredentials->sessionToken,
+                                      pRequestInfo->pAwsCredentials->sessionTokenLen));
     }
 
 CleanUp:
@@ -176,7 +176,7 @@ STATUS signAwsRequestInfoQueryParam(PRequestInfo pRequestInfo)
     // Need to add host header
     CHK_STATUS(getRequestHost(pRequestInfo->url, &pHostStart, &pHostEnd));
     len = (INT32)(pHostEnd - pHostStart);
-    CHK_STATUS(setRequestHeader(pRequestInfo, AWS_SIG_V4_HEADER_HOST, 0, pHostStart, len));
+    CHK_STATUS(request_header_set(pRequestInfo, AWS_SIG_V4_HEADER_HOST, 0, pHostStart, len));
 
     // Encode the credentials scope
     CHK_STATUS(generateEncodedCredentials(pRequestInfo, dateTimeStr, NULL, &credsLen));
@@ -278,7 +278,7 @@ STATUS getCanonicalQueryParams(PCHAR pUrl, UINT32 urlLen, BOOL uriEncode, PCHAR*
     pQueryParamStart++;
 
     // Create the single list to hold the sorted params
-    CHK_STATUS(singleListCreate(&pSingleList));
+    CHK_STATUS(single_list_create(&pSingleList));
 
     while (iterate) {
         pQueryParamEnd = STRNCHR(pQueryParamStart, (UINT32)(pEndPtr - pQueryParamStart), '&');
@@ -321,11 +321,11 @@ STATUS getCanonicalQueryParams(PCHAR pUrl, UINT32 urlLen, BOOL uriEncode, PCHAR*
         }
 
         // Iterate through the list and insert in an alpha order
-        CHK_STATUS(singleListGetHeadNode(pSingleList, &pCurNode));
+        CHK_STATUS(single_list_getHeadNode(pSingleList, &pCurNode));
         inserted = FALSE;
         pPrevNode = NULL;
         while (!inserted && pCurNode != NULL) {
-            CHK_STATUS(singleListGetNodeData(pCurNode, &item));
+            CHK_STATUS(single_list_getNodeData(pCurNode, &item));
             pParam = (PCHAR) item;
 
             if (STRCMP(pNewParam, pParam) <= 0) {
@@ -347,7 +347,7 @@ STATUS getCanonicalQueryParams(PCHAR pUrl, UINT32 urlLen, BOOL uriEncode, PCHAR*
 
         if (!inserted) {
             // If not inserted then add to the tail
-            CHK_STATUS(singleListInsertItemTail(pSingleList, (UINT64) pNewParam));
+            CHK_STATUS(single_list_insertItemTail(pSingleList, (UINT64) pNewParam));
         }
 
         // Advance the start
@@ -361,9 +361,9 @@ STATUS getCanonicalQueryParams(PCHAR pUrl, UINT32 urlLen, BOOL uriEncode, PCHAR*
     *(pQuery + remaining) = '\0';
     pCurPtr = pQuery;
 
-    CHK_STATUS(singleListGetHeadNode(pSingleList, &pCurNode));
+    CHK_STATUS(single_list_getHeadNode(pSingleList, &pCurNode));
     while (pCurNode != NULL) {
-        CHK_STATUS(singleListGetNodeData(pCurNode, &item));
+        CHK_STATUS(single_list_getNodeData(pCurNode, &item));
         pParam = (PCHAR) item;
 
         // Account for '&'
@@ -389,8 +389,8 @@ STATUS getCanonicalQueryParams(PCHAR pUrl, UINT32 urlLen, BOOL uriEncode, PCHAR*
 CleanUp:
 
     if (pSingleList != NULL) {
-        singleListClear(pSingleList, TRUE);
-        singleListFree(pSingleList);
+        single_list_clear(pSingleList, TRUE);
+        single_list_free(pSingleList);
     }
 
     if (ppQuery != NULL) {
@@ -424,7 +424,7 @@ STATUS generateCanonicalRequestString(PRequestInfo pRequestInfo, PCHAR pRequestS
 
     CHK(pRequestInfo != NULL && pRequestLen != NULL, STATUS_NULL_ARG);
 
-    CHK_STATUS(singleListGetNodeCount(pRequestInfo->pRequestHeaders, &itemCount));
+    CHK_STATUS(single_list_getNodeCount(pRequestInfo->pRequestHeaders, &itemCount));
 
     // Calculate the rough max size first including the new lines and hex of the 256 bit hash (2 * 32)
     //    CanonicalRequest =
@@ -539,11 +539,11 @@ STATUS generateCanonicalHeaders(PRequestInfo pRequestInfo, PCHAR pCanonicalHeade
 
     specifiedLen = *pCanonicalHeadersLen;
 
-    CHK_STATUS(singleListGetHeadNode(pRequestInfo->pRequestHeaders, &pCurNode));
+    CHK_STATUS(single_list_getHeadNode(pRequestInfo->pRequestHeaders, &pCurNode));
 
     // Iterate through the headers
     while (pCurNode != NULL) {
-        CHK_STATUS(singleListGetNodeData(pCurNode, &item));
+        CHK_STATUS(single_list_getNodeData(pCurNode, &item));
         pRequestHeader = (PRequestHeader) item;
 
         // Process only if we have a canonical header name
@@ -603,11 +603,11 @@ STATUS generateSignedHeaders(PRequestInfo pRequestInfo, PCHAR pSignedHeaders, PU
 
     specifiedLen = *pSignedHeadersLen;
 
-    CHK_STATUS(singleListGetHeadNode(pRequestInfo->pRequestHeaders, &pCurNode));
+    CHK_STATUS(single_list_getHeadNode(pRequestInfo->pRequestHeaders, &pCurNode));
 
     // Iterate through the headers
     while (pCurNode != NULL) {
-        CHK_STATUS(singleListGetNodeData(pCurNode, &item));
+        CHK_STATUS(single_list_getNodeData(pCurNode, &item));
         pRequestHeader = (PRequestHeader) item;
 
         // Process only if we have a canonical header name

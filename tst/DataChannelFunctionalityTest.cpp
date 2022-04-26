@@ -29,8 +29,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_Disconnected)
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     auto onDataChannel = [](UINT64 customData, PRtcDataChannel pRtcDataChannel) {
         auto remoteOpen = reinterpret_cast<RemoteOpen*>(customData);
@@ -46,7 +46,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_Disconnected)
                 remoteOpen->channels.emplace(name, count + 1);
             }
         }
-        dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+        data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -62,18 +62,18 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_Disconnected)
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -82,10 +82,10 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_Disconnected)
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
     }
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     ASSERT_EQ(ATOMIC_LOAD(&datachannelLocalOpenCount), 2);
     ASSERT_EQ(ATOMIC_LOAD(&msgCount), 2);
@@ -122,27 +122,27 @@ TEST_F(DataChannelFunctionalityTest, dataChannelSendRecvMessageAfterDtlsComplete
         }
     };
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &pOfferRemoteDataChannel, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &pAnswerRemoteDataChannel, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &pOfferRemoteDataChannel, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &pAnswerRemoteDataChannel, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
     // Busy wait until remote channel open and dtls completed
     for (auto i = 0; i <= 100 &&
-         (dtlsSessionIsInitFinished(((PKvsPeerConnection) offerPc)->pDtlsSession, &dtlsCompleted) || ATOMIC_LOAD(&pOfferRemoteDataChannel) == 0);
+         (dtls_session_isConnected(((PKvsPeerConnection) offerPc)->pDtlsSession, &dtlsCompleted) || ATOMIC_LOAD(&pOfferRemoteDataChannel) == 0);
          i++) {
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
     }
@@ -150,7 +150,7 @@ TEST_F(DataChannelFunctionalityTest, dataChannelSendRecvMessageAfterDtlsComplete
     EXPECT_EQ(dtlsCompleted, TRUE);
     EXPECT_TRUE(ATOMIC_LOAD(&pOfferRemoteDataChannel) != 0);
 
-    EXPECT_EQ(dataChannelSend((PRtcDataChannel) ATOMIC_LOAD(&pOfferRemoteDataChannel), FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE,
+    EXPECT_EQ(data_channel_send((PRtcDataChannel) ATOMIC_LOAD(&pOfferRemoteDataChannel), FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE,
                               STRLEN(TEST_DATA_CHANNEL_MESSAGE)),
               STATUS_SUCCESS);
 
@@ -160,10 +160,10 @@ TEST_F(DataChannelFunctionalityTest, dataChannelSendRecvMessageAfterDtlsComplete
     }
     EXPECT_EQ(ATOMIC_LOAD(&msgCount), 1);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorderedMaxPacketLifeTimeParameterSet)
@@ -179,8 +179,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorder
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     // Set partial reliability parameters
     NULLABLE_SET_VALUE(rtcDataChannelInit.maxPacketLifeTime, 1234);
@@ -201,7 +201,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorder
               remoteOpen->channels.emplace(name, count + 1);
           }
       }
-      dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+      data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -217,18 +217,18 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorder
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -237,8 +237,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorder
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
     }
     // Close the connection to avoid data race while accessing SctpSession
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
     pKvsDataChannel = (PKvsDataChannel) pOfferDataChannel;
     pSctpSession = ((PKvsPeerConnection) pKvsDataChannel->pRtcPeerConnection)->pSctpSession;
@@ -247,8 +247,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnorder
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_policy, SCTP_PR_SCTP_TTL);
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_value, rtcDataChannelInit.maxPacketLifeTime.value);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrderedMaxRetransmitsParameterSet)
@@ -264,8 +264,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrder
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     // Set partial reliability parameters
     NULLABLE_SET_VALUE(rtcDataChannelInit.maxRetransmits, 5);
@@ -286,7 +286,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrder
               remoteOpen->channels.emplace(name, count + 1);
           }
       }
-      dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+      data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -302,18 +302,18 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrder
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -323,8 +323,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrder
     }
 
     // Close the connection to avoid data race while accessing SctpSession
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
     pKvsDataChannel = (PKvsDataChannel) pOfferDataChannel;
     pSctpSession = ((PKvsPeerConnection) pKvsDataChannel->pRtcPeerConnection)->pSctpSession;
@@ -333,8 +333,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityUnOrder
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_policy, SCTP_PR_SCTP_RTX);
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_value, rtcDataChannelInit.maxRetransmits.value);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrderedMaxPacketLifeTimeParameterSet)
@@ -350,8 +350,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     // Set partial reliability parameters
     NULLABLE_SET_VALUE(rtcDataChannelInit.maxPacketLifeTime, 1234);
@@ -372,7 +372,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
               remoteOpen->channels.emplace(name, count + 1);
           }
       }
-      dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+      data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -388,18 +388,18 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -409,8 +409,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
     }
 
     // Close the connection to avoid data race while accessing SctpSession
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
     pKvsDataChannel = (PKvsDataChannel) pOfferDataChannel;
     pSctpSession = ((PKvsPeerConnection) pKvsDataChannel->pRtcPeerConnection)->pSctpSession;
@@ -419,8 +419,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_policy, SCTP_PR_SCTP_TTL);
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_value, rtcDataChannelInit.maxPacketLifeTime.value);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrderedMaxRetransmitsParameterSet)
@@ -436,8 +436,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     // Set partial reliability parameters
     NULLABLE_SET_VALUE(rtcDataChannelInit.maxRetransmits, 5);
@@ -458,7 +458,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
               remoteOpen->channels.emplace(name, count + 1);
           }
       }
-      dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+      data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -474,18 +474,18 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", &rtcDataChannelInit, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", NULL, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -495,8 +495,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
     }
 
     // Close the connection to avoid data race while accessing SctpSession
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
     pKvsDataChannel = (PKvsDataChannel) pOfferDataChannel;
     pSctpSession = ((PKvsPeerConnection) pKvsDataChannel->pRtcPeerConnection)->pSctpSession;
     
@@ -504,8 +504,8 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_PartialReliabilityOrdered
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_policy, SCTP_PR_SCTP_RTX);
     ASSERT_EQ(pSctpSession->spa.sendv_prinfo.pr_value, rtcDataChannelInit.maxRetransmits.value);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(DataChannelFunctionalityTest, createDataChannel_DataChannelMetricsTest)
@@ -518,12 +518,12 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_DataChannelMetricsTest)
     RtcStats rtcMetrics;
     rtcMetrics.requestedTypeOfStats = RTC_STATS_TYPE_DATA_CHANNEL;
 
-    EXPECT_EQ(rtcPeerConnectionGetMetrics(NULL, NULL, NULL), STATUS_NULL_ARG);
+    EXPECT_EQ(metrics_get(NULL, NULL, NULL), STATUS_NULL_ARG);
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     auto onDataChannel = [](UINT64 customData, PRtcDataChannel pRtcDataChannel) {
         auto remoteOpen = reinterpret_cast<RemoteOpen*>(customData);
@@ -539,7 +539,7 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_DataChannelMetricsTest)
                 remoteOpen->channels.emplace(name, count + 1);
             }
         }
-        dataChannelSend(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
+        data_channel_send(pRtcDataChannel, FALSE, (PBYTE) TEST_DATA_CHANNEL_MESSAGE, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     };
 
     auto dataChannelOnOpenCallback = [](UINT64 customData, PRtcDataChannel pDataChannel) {
@@ -555,21 +555,21 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_DataChannelMetricsTest)
         }
     };
 
-    EXPECT_EQ(peerConnectionOnDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(offerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onDataChannel(answerPc, (UINT64) &remoteOpen, onDataChannel), STATUS_SUCCESS);
 
     // Create two DataChannels
-    EXPECT_EQ(createDataChannel(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(offerPc, (PCHAR) "Offer PeerConnection", nullptr, &pOfferDataChannel), STATUS_SUCCESS);
     rtcMetrics.rtcStatsObject.rtcDataChannelStats.dataChannelIdentifier = pOfferDataChannel->id;
-    EXPECT_EQ(rtcPeerConnectionGetMetrics(offerPc, NULL, &rtcMetrics), STATUS_SUCCESS);
+    EXPECT_EQ(metrics_get(offerPc, NULL, &rtcMetrics), STATUS_SUCCESS);
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.state, RTC_DATA_CHANNEL_STATE_CONNECTING);
-    EXPECT_EQ(createDataChannel(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_create(answerPc, (PCHAR) "Answer PeerConnection", nullptr, &pAnswerDataChannel), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pOfferDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onOpen(pAnswerDataChannel, (UINT64) &datachannelLocalOpenCount, dataChannelOnOpenCallback), STATUS_SUCCESS);
 
-    EXPECT_EQ(dataChannelOnMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
-    EXPECT_EQ(dataChannelOnMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pOfferDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
+    EXPECT_EQ(data_channel_onMessage(pAnswerDataChannel, (UINT64) &msgCount, dataChannelOnMessageCallback), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -577,17 +577,17 @@ TEST_F(DataChannelFunctionalityTest, createDataChannel_DataChannelMetricsTest)
     for (auto i = 0; i <= 100 && (ATOMIC_LOAD(&datachannelLocalOpenCount) + ATOMIC_LOAD(&msgCount)) != 4; i++) {
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
     }
-    EXPECT_EQ(rtcPeerConnectionGetMetrics(offerPc, NULL, &rtcMetrics), STATUS_SUCCESS);
+    EXPECT_EQ(metrics_get(offerPc, NULL, &rtcMetrics), STATUS_SUCCESS);
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.bytesReceived, 0);
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.messagesReceived, 0);
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.bytesSent, STRLEN(TEST_DATA_CHANNEL_MESSAGE));
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.messagesSent, 1);
     EXPECT_EQ(rtcMetrics.rtcStatsObject.rtcDataChannelStats.state, RTC_DATA_CHANNEL_STATE_OPEN);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 } // namespace webrtcclient

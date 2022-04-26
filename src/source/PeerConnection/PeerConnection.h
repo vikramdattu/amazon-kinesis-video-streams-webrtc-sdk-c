@@ -1,6 +1,17 @@
-/*******************************************
-PeerConnection internal include file
-*******************************************/
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
 #ifndef __KINESIS_VIDEO_WEBRTC_CLIENT_PEERCONNECTION_PEERCONNECTION__
 #define __KINESIS_VIDEO_WEBRTC_CLIENT_PEERCONNECTION_PEERCONNECTION__
 
@@ -9,16 +20,22 @@ PeerConnection internal include file
 #ifdef __cplusplus
 extern "C" {
 #endif
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 #include "kvs/error.h"
 #include "kvs/common_defs.h"
 #include "hash_table.h"
 #include "double_linked_list.h"
 #include "dtls.h"
-#include "IceAgent.h"
+#include "ice_agent.h"
 #include "network.h"
-#include "SrtpSession.h"
-#include "Sctp.h"
+#include "srtp_session.h"
+#include "sctp_session.h"
 
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 #define LOCAL_ICE_UFRAG_LEN 4
 #define LOCAL_ICE_PWD_LEN   24
 #define LOCAL_CNAME_LEN     16
@@ -47,18 +64,18 @@ extern "C" {
 // Environment variable to display SDPs
 #define DEBUG_LOG_SDP ((PCHAR) "DEBUG_LOG_SDP")
 
-typedef enum {
+typedef enum __RTX_CODEC {
     RTC_RTX_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE = 1,
     RTC_RTX_CODEC_VP8 = 2,
 } RTX_CODEC;
 /**
  * @brief internal structure for peer connection.
  */
-typedef struct {
+typedef struct __KvsPeerConnection {
     RtcPeerConnection peerConnection;
     PIceAgent pIceAgent;
-    PDtlsSession pDtlsSession;
-    BOOL dtlsIsServer; //!< indicate the role of dtls session.
+    PDtlsSession pDtlsSession; //!< The context of the dtls session. It will be initialized when the ice agent is ready.
+    BOOL dtlsIsServer;         //!< indicate the role of dtls session.
 #ifdef ENABLE_STREAMING
     MUTEX pSrtpSessionLock; //!< the lock for srtp session.
     PSrtpSession pSrtpSession;
@@ -114,6 +131,7 @@ typedef struct {
     NullableBool canTrickleIce; //!< indicate the behavior of ice, trickle ice or non-trickle ice.
                                 ///!< https://tools.ietf.org/html/rfc8838
 } KvsPeerConnection, *PKvsPeerConnection;
+
 #ifdef ENABLE_DATA_CHANNEL
 typedef struct {
     UINT32 currentDataChannelId;
@@ -121,8 +139,12 @@ typedef struct {
     PHashTable unkeyedDataChannels;
 } AllocateSctpSortDataChannelsData, *PAllocateSctpSortDataChannelsData;
 #endif
-STATUS onFrameReadyFunc(UINT64, UINT16, UINT16, UINT32);
-STATUS onFrameDroppedFunc(UINT64, UINT16, UINT16, UINT32);
+
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
+STATUS pc_onFrameReady(UINT64, UINT16, UINT16, UINT32);
+STATUS pc_onFrameDrop(UINT64 customData, UINT16 startIndex, UINT16 endIndex, UINT32 timestamp);
 /**
  * @brief the callback for dtls socket layer.
  *
@@ -132,14 +154,22 @@ STATUS onFrameDroppedFunc(UINT64, UINT16, UINT16, UINT32);
  *
  * @return STATUS status of execution
  */
-VOID onSctpSessionOutboundPacket(UINT64, PBYTE, UINT32);
-VOID onSctpSessionDataChannelMessage(UINT64, UINT32, BOOL, PBYTE, UINT32);
-VOID onSctpSessionDataChannelOpen(UINT64, UINT32, PBYTE, UINT32);
+VOID pc_onSctpSessionOutboundPacket(UINT64, PBYTE, UINT32);
+VOID pc_onSctpSessionDataChannelMessage(UINT64, UINT32, BOOL, PBYTE, UINT32);
+VOID pc_onSctpSessionDataChannelOpen(UINT64, UINT32, PBYTE, UINT32);
+/**
+ * @brief send packets to the corresponding rtp receiver.
+ *
+ * @param[in] pKvsPeerConnection the user context.
+ * @param[in] pBuffer the address of packet.
+ * @param[in] bufferLen the length of packet.
+ *
+ * @return STATUS status of execution
+ */
+STATUS pc_sendPacketToRtpReceiver(PKvsPeerConnection pKvsPeerConnection, PBYTE pBuffer, UINT32 bufferLen);
+STATUS pc_changeState(PKvsPeerConnection, RTC_PEER_CONNECTION_STATE);
 
-STATUS sendPacketToRtpReceiver(PKvsPeerConnection, PBYTE, UINT32);
-STATUS changePeerConnectionState(PKvsPeerConnection, RTC_PEER_CONNECTION_STATE);
-
-STATUS generateJSONSafeString(PCHAR, UINT32);
+STATUS json_generateSafeString(PCHAR, UINT32);
 
 #ifdef __cplusplus
 }

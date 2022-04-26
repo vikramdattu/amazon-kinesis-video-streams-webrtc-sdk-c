@@ -21,6 +21,8 @@
 #include <mbedtls/base64.h>
 #include <mbedtls/sha1.h>
 
+#include <sys/socket.h>
+
 #include "kvs/error.h"
 #include "kvs/common_defs.h"
 #include "kvs/platform_utils.h"
@@ -33,19 +35,8 @@
 #define WSS_CLIENT_ENTER() // DLOGD("%s(%d) enter", __func__, __LINE__)
 #define WSS_CLIENT_EXIT()  // DLOGD("%s(%d) exit", __func__, __LINE__);
 
-#define CLIENT_LOCK(pWssClientCtx)   MUTEX_LOCK(pWssClientCtx->clientLock)
-#define CLIENT_UNLOCK(pWssClientCtx) MUTEX_UNLOCK(pWssClientCtx->clientLock)
-#define LISTENER_LOCK(pWssClientCtx)                                                                                                                 \
-    do {                                                                                                                                             \
-        CHK((pWssClientCtx != NULL) && IS_VALID_MUTEX_VALUE(pWssClientCtx->clientLock), STATUS_WSS_CLIENT_INVALID_ARG);                              \
-        MUTEX_LOCK(pWssClientCtx->listenerLock);                                                                                                     \
-    } while (0)
-#define LISTENER_UNLOCK(pWssClientCtx)                                                                                                               \
-    do {                                                                                                                                             \
-        if (pWssClientCtx != NULL && IS_VALID_MUTEX_VALUE(pWssClientCtx->clientLock)) {                                                              \
-            MUTEX_UNLOCK(pWssClientCtx->listenerLock);                                                                                               \
-        }                                                                                                                                            \
-    } while (0)
+#define IO_LOCK(pWssClientCtx)   MUTEX_LOCK(pWssClientCtx->ioLock)
+#define IO_UNLOCK(pWssClientCtx) MUTEX_UNLOCK(pWssClientCtx->ioLock)
 
 #define WSLAY_SUCCESS 0
 
@@ -203,9 +194,9 @@ INT32 wss_client_wantRead(PWssClientContext pWssClientCtx)
 {
     WSS_CLIENT_ENTER();
     INT32 retStatus = TRUE;
-    CLIENT_LOCK(pWssClientCtx);
+    IO_LOCK(pWssClientCtx);
     retStatus = wslay_event_want_read(pWssClientCtx->event_ctx);
-    CLIENT_UNLOCK(pWssClientCtx);
+    IO_UNLOCK(pWssClientCtx);
     WSS_CLIENT_EXIT();
     return retStatus;
 }
@@ -214,11 +205,15 @@ STATUS wss_client_onReadEvent(PWssClientContext pWssClientCtx)
 {
     WSS_CLIENT_ENTER();
     STATUS retStatus = STATUS_SUCCESS;
-    CLIENT_LOCK(pWssClientCtx);
+    IO_LOCK(pWssClientCtx);
     if (wslay_event_get_read_enabled(pWssClientCtx->event_ctx) == 1) {
-        retStatus = wslay_event_recv(pWssClientCtx->event_ctx) == 0 ? STATUS_SUCCESS : STATUS_WSS_CLIENT_RECV_FAILED;
+        int res = wslay_event_recv(pWssClientCtx->event_ctx);
+        if (res != WSLAY_SUCCESS) {
+            DLOGE("Wss client throws an error(%d)", res);
+        }
+        retStatus = (res == WSLAY_SUCCESS) ? STATUS_SUCCESS : STATUS_WSS_CLIENT_RECV_FAILED;
     }
-    CLIENT_UNLOCK(pWssClientCtx);
+    IO_UNLOCK(pWssClientCtx);
     WSS_CLIENT_EXIT();
     return retStatus;
 }
@@ -227,7 +222,7 @@ static STATUS wss_client_send(PWssClientContext pWssClientCtx, struct wslay_even
 {
     WSS_CLIENT_ENTER();
     STATUS retStatus = STATUS_SUCCESS;
-    CLIENT_LOCK(pWssClientCtx);
+    IO_LOCK(pWssClientCtx);
     // #TBD, wslay will memcpy this message buffer, so we can release the message buffer.
     // But this is a tradeoff. We can evaluate this design later.
     if (wslay_event_get_write_enabled(pWssClientCtx->event_ctx) == 1) {
@@ -237,7 +232,7 @@ static STATUS wss_client_send(PWssClientContext pWssClientCtx, struct wslay_even
     }
 
 CleanUp:
-    CLIENT_UNLOCK(pWssClientCtx);
+    IO_UNLOCK(pWssClientCtx);
     WSS_CLIENT_EXIT();
     return retStatus;
 }
@@ -266,12 +261,12 @@ STATUS wss_client_sendPing(PWssClientContext pWssClientCtx)
     MEMSET(&arg, 0, sizeof(arg));
     arg.opcode = WSLAY_PING;
     arg.msg_length = 0;
-    DLOGD("ping ==>");
+    DLOGD("wss ping ==>");
     return wss_client_send(pWssClientCtx, &arg);
 }
 
 VOID wss_client_create(PWssClientContext* ppWssClientCtx, NetIoHandle xNetIoHandle, PVOID pUserData, MessageHandlerFunc pFunc,
-                       CtrlMessageHandlerFunc pCtrlFunc, TerminationHandlerFunc pTerminationHandlerFunc)
+                       CtrlMessageHandlerFunc pCtrlFunc)
 {
     WSS_CLIENT_ENTER();
     STATUS retStatus = STATUS_SUCCESS;
@@ -294,25 +289,22 @@ VOID wss_client_create(PWssClientContext* ppWssClientCtx, NetIoHandle xNetIoHand
     pWssClientCtx->pUserData = pUserData;
     pWssClientCtx->messageHandler = pFunc;
     pWssClientCtx->ctrlMessageHandler = pCtrlFunc;
-    pWssClientCtx->terminationHandler = pTerminationHandlerFunc;
 
     // the initialization of the mutex
-    pWssClientCtx->clientLock = MUTEX_CREATE(FALSE);
-    CHK(IS_VALID_MUTEX_VALUE(pWssClientCtx->clientLock), STATUS_INVALID_OPERATION);
-    pWssClientCtx->listenerLock = MUTEX_CREATE(FALSE);
-    CHK(IS_VALID_MUTEX_VALUE(pWssClientCtx->listenerLock), STATUS_INVALID_OPERATION);
+    pWssClientCtx->ioLock = MUTEX_CREATE(FALSE);
+    CHK(IS_VALID_MUTEX_VALUE(pWssClientCtx->ioLock), STATUS_INVALID_OPERATION);
 
     pWssClientCtx->pingCounter = 0;
 
     wslay_event_context_client_init(&pWssClientCtx->event_ctx, &pWssClientCtx->event_callbacks, pWssClientCtx);
-    pWssClientCtx->listenerTid = INVALID_TID_VALUE;
+    pWssClientCtx->clientTid = INVALID_TID_VALUE;
     *ppWssClientCtx = pWssClientCtx;
 CleanUp:
     WSS_CLIENT_EXIT();
     return;
 }
 
-PVOID wss_client_start(PWssClientContext pWssClientCtx)
+PVOID wss_client_routine(PWssClientContext pWssClientCtx)
 {
     WSS_CLIENT_ENTER();
     STATUS retStatus = STATUS_SUCCESS;
@@ -324,7 +316,7 @@ PVOID wss_client_start(PWssClientContext pWssClientCtx)
     // for ping-pong.
     UINT32 counter = 0;
 
-    LISTENER_LOCK(pWssClientCtx);
+    DLOGD("Wss client is up");
     wslay_event_config_set_callbacks(pWssClientCtx->event_ctx, &pWssClientCtx->event_callbacks);
     NetIo_setRecvTimeout(pWssClientCtx->xNetIoHandle, WSS_CLIENT_POLLING_INTERVAL);
 
@@ -332,7 +324,8 @@ PVOID wss_client_start(PWssClientContext pWssClientCtx)
     FD_ZERO(&rfds);
 
     // check the wss client want to read or write or not.
-
+    // When the wss lib receive the ctrl frame of close connection, this flag of read_enabled will be pull down.
+    // It means we do not need to handle this loop when the connection is closed.
     while (pWssClientCtx != NULL && wss_client_wantRead(pWssClientCtx)) {
         // need to setup the timeout of epoll in order to let the wss cleint thread to write the buffer out.
         FD_SET(nfds, &rfds);
@@ -343,38 +336,50 @@ PVOID wss_client_start(PWssClientContext pWssClientCtx)
         retval = select(nfds + 1, &rfds, NULL, NULL, &tv);
 
         if (retval == -1) {
-            DLOGE("select() failed with errno %s", getErrorString(getErrorCode()));
+            DLOGE("select() failed with errno %s", net_getErrorString(net_getErrorCode()));
             continue;
         }
 
         if (FD_ISSET(nfds, &rfds)) {
-            if (wss_client_onReadEvent(pWssClientCtx)) {
-                DLOGE("on read event failed");
-            }
-        }
-        // for ping-pong
-        if (pWssClientCtx->pingCounter > WSS_CLIENT_PING_PONG_COUNTER) {
-            pWssClientCtx->ctrlMessageHandler(pWssClientCtx->pUserData, WSLAY_CONNECTION_CLOSE, "connection lost", STRLEN("connection lost"));
+            CHK_ERR(wss_client_onReadEvent(pWssClientCtx) == STATUS_SUCCESS, STATUS_WSS_CLIENT_RECV_FAILED,
+                    "The onRead event of wss connection failed");
         }
 
+        // for ping-pong
         pWssClientCtx->pingCounter++;
-        if (pWssClientCtx->pingCounter == WSS_CLIENT_PING_PONG_COUNTER) {
-            CHK_STATUS(wss_client_sendPing(pWssClientCtx));
+        if (pWssClientCtx->pingCounter >= WSS_CLIENT_PING_PONG_COUNTER) {
+            CHK(wss_client_sendPing(pWssClientCtx) == STATUS_SUCCESS, STATUS_WSS_CLIENT_PING_FAILED);
             pWssClientCtx->pingCounter = 0;
         }
     }
 
 CleanUp:
 
-    LISTENER_UNLOCK(pWssClientCtx);
-    if (pWssClientCtx->terminationHandler != NULL) {
-        pWssClientCtx->terminationHandler(pWssClientCtx->pUserData, retStatus);
+    if (STATUS_FAILED(retStatus)) {
+        DLOGW("The wss connection may be lost. We are closing it.");
+        pWssClientCtx->ctrlMessageHandler(pWssClientCtx->pUserData, WSLAY_CONNECTION_CLOSE, "The connection may be lost",
+                                          STRLEN("The connection may be lost"));
     }
-
-    pWssClientCtx->listenerTid = INVALID_TID_VALUE;
+    DLOGD("Wss client is down");
     THREAD_EXIT(NULL);
     WSS_CLIENT_EXIT();
     return (PVOID)(ULONG_PTR) retStatus;
+}
+
+STATUS wss_client_start(PWssClientContext pWssClientCtx)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+
+    if (!IS_VALID_TID_VALUE(pWssClientCtx->clientTid)) {
+        CHK_STATUS(THREAD_CREATE_EX(&pWssClientCtx->clientTid, WSS_CLIENT_THREAD_NAME, WSS_CLIENT_THREAD_SIZE, TRUE, wss_client_routine,
+                                    (PVOID) pWssClientCtx));
+    } else {
+        DLOGW("Unknown wss connection.");
+    }
+
+CleanUp:
+
+    return retStatus;
 }
 
 VOID wss_client_close(PWssClientContext pWssClientCtx)
@@ -383,21 +388,27 @@ VOID wss_client_close(PWssClientContext pWssClientCtx)
 
     CHK(pWssClientCtx != NULL, STATUS_WSS_CLIENT_NULL_ARG);
 
-    if (IS_VALID_MUTEX_VALUE(pWssClientCtx->clientLock)) {
-        CLIENT_LOCK(pWssClientCtx);
+    if (IS_VALID_MUTEX_VALUE(pWssClientCtx->ioLock)) {
+        // exit the thread of wss_client_routine.
+        IO_LOCK(pWssClientCtx);
         wslay_event_shutdown_read(pWssClientCtx->event_ctx);
         wslay_event_shutdown_write(pWssClientCtx->event_ctx);
-        wslay_event_context_free(pWssClientCtx->event_ctx);
-        CLIENT_UNLOCK(pWssClientCtx);
+        IO_UNLOCK(pWssClientCtx);
     }
 
-    if (IS_VALID_MUTEX_VALUE(pWssClientCtx->listenerLock)) {
-        MUTEX_FREE(pWssClientCtx->listenerLock);
-        pWssClientCtx->listenerLock = INVALID_MUTEX_VALUE;
+    // make sure the thread of wss_client_routine exit.
+    if (IS_VALID_TID_VALUE(pWssClientCtx->clientTid)) {
+        // waiting the termination of listener thread.
+        THREAD_JOIN(pWssClientCtx->clientTid, NULL);
+        pWssClientCtx->clientTid = INVALID_TID_VALUE;
     }
-    if (IS_VALID_MUTEX_VALUE(pWssClientCtx->clientLock)) {
-        MUTEX_FREE(pWssClientCtx->clientLock);
-        pWssClientCtx->clientLock = INVALID_MUTEX_VALUE;
+
+    wslay_event_context_free(pWssClientCtx->event_ctx);
+    pWssClientCtx->event_ctx = NULL;
+
+    if (IS_VALID_MUTEX_VALUE(pWssClientCtx->ioLock)) {
+        MUTEX_FREE(pWssClientCtx->ioLock);
+        pWssClientCtx->ioLock = INVALID_MUTEX_VALUE;
     }
 
     if (pWssClientCtx->xNetIoHandle != NULL) {
@@ -407,7 +418,6 @@ VOID wss_client_close(PWssClientContext pWssClientCtx)
     }
 
 CleanUp:
-
     SAFE_MEMFREE(pWssClientCtx);
     return;
 }

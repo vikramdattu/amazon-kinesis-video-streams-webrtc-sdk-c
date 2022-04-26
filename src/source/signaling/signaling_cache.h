@@ -12,8 +12,8 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
-#ifndef __AWS_KVS_WEBRTC_FILE_CACHE_INCLUDE__
-#define __AWS_KVS_WEBRTC_FILE_CACHE_INCLUDE__
+#ifndef __AWS_KVS_WEBRTC_SIGNALING_CACHE_INCLUDE__
+#define __AWS_KVS_WEBRTC_SIGNALING_CACHE_INCLUDE__
 
 #pragma once
 
@@ -23,12 +23,15 @@ extern "C" {
 /******************************************************************************
  * HEADERS
  ******************************************************************************/
+#include "kvs/config.h"
+#include "kvs/error.h"
+#include "kvs/common_defs.h"
+#include "kvs/webrtc_client.h"
 /******************************************************************************
  * DEFINITIONS
  ******************************************************************************/
 /* If SignalingFileCacheEntry layout is changed, change the version in cache file name so we wont read from older
  * cache file. */
-#define DEFAULT_CACHE_FILE_PATH                     "./.SignalingCache_v0"
 #define MAX_SIGNALING_CACHE_ENTRY_TIMESTAMP_STR_LEN 10
 /* Max length for a serialized signaling cache entry. 8 accounts for 6 commas and 1 newline
  * char and null terminator */
@@ -51,10 +54,10 @@ typedef struct {
 /******************************************************************************
  * FUNCTIONS
  ******************************************************************************/
-STATUS signalingCacheLoadFromFile(PCHAR, PCHAR, SIGNALING_CHANNEL_ROLE_TYPE, PSignalingFileCacheEntry, PBOOL);
-STATUS signalingCacheSaveToFile(PSignalingFileCacheEntry);
+STATUS signaling_cache_loadFromFile(PCHAR, PCHAR, SIGNALING_CHANNEL_ROLE_TYPE, PSignalingFileCacheEntry, PBOOL);
+STATUS signaling_cache_saveToFile(PSignalingFileCacheEntry);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* __AWS_KVS_WEBRTC_FILE_CACHE_INCLUDE__ */
+#endif /* __AWS_KVS_WEBRTC_SIGNALING_CACHE_INCLUDE__ */

@@ -115,7 +115,7 @@ struct __DtlsSession {
     UINT32 timerId;
     UINT64 dtlsSessionStartTime;
     RTC_DTLS_TRANSPORT_STATE state;
-    MUTEX sslLock;
+    MUTEX nestedDtlsLock;
 
 #ifdef KVS_USE_OPENSSL
     volatile ATOMIC_BOOL sslInitFinished;
@@ -141,7 +141,8 @@ struct __DtlsSession {
 };
 
 /**
- * Create DTLS session. Not thread safe.
+ * @brief Create DTLS session. Not thread safe.
+ *
  * @param[in] PDtlsSessionCallbacks - callbacks
  * @param[in] TIMER_QUEUE_HANDLE - timer handle to schedule timer task with
  * @param[in] INT32 - size of generated certificate
@@ -151,27 +152,45 @@ struct __DtlsSession {
  *
  * @return STATUS - status of operation
  */
-STATUS createDtlsSession(PDtlsSessionCallbacks, TIMER_QUEUE_HANDLE, INT32, BOOL, PRtcCertificate, PDtlsSession*);
+STATUS dtls_session_create(PDtlsSessionCallbacks, TIMER_QUEUE_HANDLE, INT32, BOOL, PRtcCertificate, PDtlsSession*);
 
 /**
  * Free DTLS session. Not thread safe.
  * @param PDtlsSession - DtlsSession object to free
  * @return STATUS - status of operation
  */
-STATUS freeDtlsSession(PDtlsSession*);
-
+STATUS dtls_session_free(PDtlsSession*);
 /**
- * Start DTLS handshake. Not thread safe.
- * @param PDtlsSession - DtlsSession object
- * @param BOOL - is server
- * @return STATUS - status of operation
+ * @brief Start DTLS handshake. Not thread safe.
+ *
+ * @param[in] pDtlsSession the context of the dtls session.
+ * @param[in] isServer is server
+ *
+ * @return STATUS status of execution.
  */
-STATUS dtlsSessionStart(PDtlsSession, BOOL);
-STATUS dtlsSessionProcessPacket(PDtlsSession, PBYTE, PINT32);
-STATUS dtlsSessionIsInitFinished(PDtlsSession, PBOOL);
-STATUS dtlsSessionPopulateKeyingMaterial(PDtlsSession, PDtlsKeyingMaterial);
-STATUS dtlsSessionGetLocalCertificateFingerprint(PDtlsSession, PCHAR, UINT32);
-STATUS dtlsSessionVerifyRemoteCertificateFingerprint(PDtlsSession, PCHAR);
+STATUS dtls_session_start(PDtlsSession pDtlsSession, BOOL isServer);
+/**
+ * @brief The handler of dtls inbound packets.
+ *
+ * @param[in] pDtlsSession the context of the dtls session.
+ * @param[in] pData
+ * @param[in] pDataLen
+ *
+ * @return STATUS status of execution.
+ */
+STATUS dtls_session_read(PDtlsSession pDtlsSession, PBYTE pData, PINT32 pDataLen);
+/**
+ * @brief Is the dtls session connected.
+ *
+ * @param[in] pDtlsSession the context of the dtls session.
+ * @param[in, out] pIsConnected is connected or not.
+ *
+ * @return STATUS status of execution.
+ */
+STATUS dtls_session_isConnected(PDtlsSession pDtlsSession, PBOOL pIsConnected);
+STATUS dtls_session_populateKeyingMaterial(PDtlsSession, PDtlsKeyingMaterial);
+STATUS dtls_session_getLocalCertificateFingerprint(PDtlsSession, PCHAR, UINT32);
+STATUS dtls_session_verifyRemoteCertificateFingerprint(PDtlsSession, PCHAR);
 /**
  * @brief  it is used for the outbound packet of sctp session.
  *
@@ -181,29 +200,29 @@ STATUS dtlsSessionVerifyRemoteCertificateFingerprint(PDtlsSession, PCHAR);
  *
  * @return STATUS_SUCCESS
  */
-STATUS dtlsSessionPutApplicationData(PDtlsSession, PBYTE, INT32);
-STATUS dtlsSessionShutdown(PDtlsSession);
+STATUS dtls_session_send(PDtlsSession, PBYTE, INT32);
+STATUS dtls_session_shutdown(PDtlsSession);
 
-STATUS dtlsSessionOnOutBoundData(PDtlsSession, UINT64, DtlsSessionOutboundPacketFunc);
-STATUS dtlsSessionOnStateChange(PDtlsSession, UINT64, DtlsSessionOnStateChange);
+STATUS dtls_session_onOutBoundData(PDtlsSession, UINT64, DtlsSessionOutboundPacketFunc);
+STATUS dtls_session_onStateChange(PDtlsSession, UINT64, DtlsSessionOnStateChange);
 
 /******** Internal Functions **********/
 STATUS dtlsValidateRtcCertificates(PRtcCertificate, PUINT32);
-STATUS dtlsSessionChangeState(PDtlsSession, RTC_DTLS_TRANSPORT_STATE);
+STATUS dtls_session_changeState(PDtlsSession, RTC_DTLS_TRANSPORT_STATE);
 
 #ifdef KVS_USE_OPENSSL
 STATUS dtlsCheckOutgoingDataBuffer(PDtlsSession);
-STATUS dtlsCertificateFingerprint(X509*, PCHAR);
+STATUS dtls_session_calculateCertificateFingerprint(X509*, PCHAR);
 STATUS dtlsGenerateCertificateFingerprints(PDtlsSession, PDtlsSessionCertificateInfo);
-STATUS createCertificateAndKey(INT32, BOOL, X509** ppCert, EVP_PKEY** ppPkey);
-STATUS freeCertificateAndKey(X509** ppCert, EVP_PKEY** ppPkey);
+STATUS certificate_key_create(INT32, BOOL, X509** ppCert, EVP_PKEY** ppPkey);
+STATUS certificate_key_free(X509** ppCert, EVP_PKEY** ppPkey);
 STATUS dtlsValidateRtcCertificates(PRtcCertificate, PUINT32);
 STATUS createSslCtx(PDtlsSessionCertificateInfo, UINT32, SSL_CTX**);
 #elif KVS_USE_MBEDTLS
-STATUS dtlsCertificateFingerprint(mbedtls_x509_crt*, PCHAR);
-STATUS copyCertificateAndKey(mbedtls_x509_crt*, mbedtls_pk_context*, PDtlsSessionCertificateInfo);
-STATUS createCertificateAndKey(INT32, BOOL, mbedtls_x509_crt*, mbedtls_pk_context*);
-STATUS freeCertificateAndKey(mbedtls_x509_crt*, mbedtls_pk_context*);
+STATUS dtls_session_calculateCertificateFingerprint(mbedtls_x509_crt*, PCHAR);
+STATUS certificate_key_copy(mbedtls_x509_crt*, mbedtls_pk_context*, PDtlsSessionCertificateInfo);
+STATUS certificate_key_create(INT32, BOOL, mbedtls_x509_crt*, mbedtls_pk_context*);
+STATUS certificate_key_free(mbedtls_x509_crt*, mbedtls_pk_context*);
 
 // following are required callbacks for mbedtls
 // NOTE: const is not a pure C qualifier, they're here because there's no way to type cast
@@ -217,13 +236,13 @@ STATUS freeCertificateAndKey(mbedtls_x509_crt*, mbedtls_pk_context*);
  *
  * @return error code. 0: success.
  */
-INT32 dtlsSessionSendCallback(PVOID, const unsigned char*, ULONG);
-INT32 dtlsSessionReceiveCallback(PVOID, unsigned char*, ULONG);
-VOID dtlsSessionSetTimerCallback(PVOID, UINT32, UINT32);
-INT32 dtlsSessionGetTimerCallback(PVOID);
-INT32 dtlsSessionKeyDerivationCallback(PVOID, const unsigned char*, const unsigned char*, ULONG, ULONG, ULONG,
-                                       const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN], const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN],
-                                       mbedtls_tls_prf_types);
+INT32 dtls_session_sendCallback(PVOID, const unsigned char*, ULONG);
+INT32 dtls_session_receiveCallback(PVOID, unsigned char*, ULONG);
+VOID dtls_session_setTimerCallback(PVOID, UINT32, UINT32);
+INT32 dtls_session_getTimerCallback(PVOID);
+INT32 dtls_session_deriveKeyCallback(PVOID, const unsigned char*, const unsigned char*, ULONG, ULONG, ULONG,
+                                     const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN], const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN],
+                                     mbedtls_tls_prf_types);
 #else
 #error "A Crypto implementation is required."
 #endif

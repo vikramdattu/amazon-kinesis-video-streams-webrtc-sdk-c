@@ -25,14 +25,14 @@ extern "C" {
 
 // https://tools.ietf.org/html/rfc5389#section-15.6
 #define STUN_MAX_ERROR_PHRASE_LEN (UINT16) 128
-
 /**
+ * @brief https://datatracker.ietf.org/doc/html/rfc5389#section-6
  * Stun header structure
- * - 2 UINT16 type len
- * - 2 UINT16 packet data len
- * - 4 UINT16 magic cookie
- * - 12 UINT16 transaction id
- * - data
+ * 2 UINT16 type len
+ * 2 UINT16 packet data len
+ * 4 UINT16 magic cookie
+ * 12 UINT16 transaction id
+ * data
  */
 #define STUN_HEADER_LEN                (UINT16) 20
 #define STUN_HEADER_TYPE_LEN           (UINT16) 2
@@ -197,16 +197,27 @@ typedef enum {
      (getInt16(*(PINT16) pPacketBuffer) == STUN_PACKET_TYPE_CREATE_PERMISSION_ERROR_RESPONSE) ||                                                     \
      (getInt16(*(PINT16) pPacketBuffer) == STUN_PACKET_TYPE_CHANNEL_BIND_ERROR_RESPONSE))
 
+#define STUN_PACKET_GET_TYPE(pPacketBuffer) getInt16(*(PINT16) pPacketBuffer)
 /**
- * STUN error codes
+ * @brief https://datatracker.ietf.org/doc/html/rfc5766#section-6.4
+ *
  */
 typedef enum {
+    STUN_ERROR_TRY_ALTERNATE = (UINT16) 300,
+    STUN_ERROR_BAD_REQUEEST = (UINT16) 400,
     STUN_ERROR_UNAUTHORIZED = (UINT16) 401,
+    STUN_ERROR_FORBIDDEN = (UINT16) 403,
+    STUN_ERROR_UNKNOWN_ATTRIBUTE = (UINT16) 420,
+    STUN_ERROR_ALLOCATION_MISMATCH = (UINT16) 437,
     STUN_ERROR_STALE_NONCE = (UINT16) 438,
+    STUN_ERROR_WRONG_CREDENTIALS = (UINT16) 441,
+    STUN_ERROR_UNSUPPORT_TRANSPORT_ADDRESS = (UINT16) 442,
+    STUN_ERROR_ALLOCATION_QUOTA_REACHED = (UINT16) 486,
+    STUN_ERROR_INSUFFICIENT_CAPACITY = (UINT16) 508,
 } STUN_ERROR_CODE;
-
 /**
- * STUN attribute types
+ * @brief STUN attribute types
+ *  https://www.iana.org/assignments/stun-parameters/stun-parameters.xml
  */
 typedef enum {
     STUN_ATTRIBUTE_TYPE_MAPPED_ADDRESS = (UINT16) 0x0001,
@@ -220,14 +231,9 @@ typedef enum {
     STUN_ATTRIBUTE_TYPE_ERROR_CODE = (UINT16) 0x0009,
     STUN_ATTRIBUTE_TYPE_UNKNOWN_ATTRIBUTES = (UINT16) 0x000A,
     STUN_ATTRIBUTE_TYPE_REFLECTED_FROM = (UINT16) 0x000B,
-    STUN_ATTRIBUTE_TYPE_XOR_MAPPED_ADDRESS = (UINT16) 0x0020,
-    STUN_ATTRIBUTE_TYPE_PRIORITY = (UINT16) 0x0024,
-    STUN_ATTRIBUTE_TYPE_USE_CANDIDATE = (UINT16) 0x0025,
-    STUN_ATTRIBUTE_TYPE_FINGERPRINT = (UINT16) 0x8028,
-    STUN_ATTRIBUTE_TYPE_ICE_CONTROLLED = (UINT16) 0x8029,
-    STUN_ATTRIBUTE_TYPE_ICE_CONTROLLING = (UINT16) 0x802A,
     STUN_ATTRIBUTE_TYPE_CHANNEL_NUMBER = (UINT16) 0x000C,
     STUN_ATTRIBUTE_TYPE_LIFETIME = (UINT16) 0x000D,
+
     STUN_ATTRIBUTE_TYPE_XOR_PEER_ADDRESS = (UINT16) 0x0012,
     STUN_ATTRIBUTE_TYPE_DATA = (UINT16) 0x0013,
     STUN_ATTRIBUTE_TYPE_REALM = (UINT16) 0x0014,
@@ -236,11 +242,33 @@ typedef enum {
     STUN_ATTRIBUTE_TYPE_EVEN_PORT = (UINT16) 0x0018,
     STUN_ATTRIBUTE_TYPE_REQUESTED_TRANSPORT = (UINT16) 0x0019,
     STUN_ATTRIBUTE_TYPE_DONT_FRAGMENT = (UINT16) 0x001A,
+
+    STUN_ATTRIBUTE_TYPE_XOR_MAPPED_ADDRESS = (UINT16) 0x0020,
     STUN_ATTRIBUTE_TYPE_RESERVATION_TOKEN = (UINT16) 0x0022,
+    STUN_ATTRIBUTE_TYPE_PRIORITY = (UINT16) 0x0024,      //!< https://datatracker.ietf.org/doc/html/rfc8445#section-7.1.1
+                                                         //!< https://datatracker.ietf.org/doc/html/rfc8445#section-5.1.2
+    STUN_ATTRIBUTE_TYPE_USE_CANDIDATE = (UINT16) 0x0025, //!< https://datatracker.ietf.org/doc/html/rfc8445#section-7.1.2
 
+    STUN_ATTRIBUTE_TYPE_SOFTWARE = (UINT16) 0x8022,
+    STUN_ATTRIBUTE_TYPE_ALTERNATE_SERVER = (UINT16) 0x8023,
+    STUN_ATTRIBUTE_TYPE_FINGERPRINT = (UINT16) 0x8028,
+    STUN_ATTRIBUTE_TYPE_ICE_CONTROLLED = (UINT16) 0x8029,  //!< https://datatracker.ietf.org/doc/html/rfc8445#section-7.1.3
+    STUN_ATTRIBUTE_TYPE_ICE_CONTROLLING = (UINT16) 0x802A, //!< https://datatracker.ietf.org/doc/html/rfc8445#section-7.1.3
+
+    // #TBD
+    STUN_ATTRIBUTE_TYPE_NOMINATION = (UINT16) 0xC001,
+    STUN_ATTRIBUTE_TYPE_GOOG_NETWORK_INFO = (UINT16) 0xC057, //!< (network-id << 16) | network-cost.
+    STUN_ATTRIBUTE_TYPE_GOOG_LAST_ICE_CHECK_RECEIVED = (UINT16) 0xC058,
+    STUN_ATTRIBUTE_TYPE_GOOG_MISC_INFO = (UINT16) 0xC059,
+    STUN_ATTRIBUTE_TYPE_GOOG_OBSOLETE_1 = (UINT16) 0xC05A,
+    STUN_ATTRIBUTE_TYPE_GOOG_CONNECTION_ID = (UINT16) 0xC05B,
+    STUN_ATTRIBUTE_TYPE_GOOG_DELTA = (UINT16) 0xC05C,
+    STUN_ATTRIBUTE_TYPE_GOOG_DELTA_ACK = (UINT16) 0xC05D,
+    STUN_ATTRIBUTE_TYPE_GOOG_MESSAGE_INTEGRITY = (UINT16) 0xC060,
+    STUN_ATTRIBUTE_TYPE_RETRANSMIT_COUNT = (UINT16) 0xFF00,
 } STUN_ATTRIBUTE_TYPE;
-
 /**
+ * @brief
  * Stun packet header definition
  *
  * IMPORTANT: This structure has exactly the same layout as the on-the-wire header for STUN packet
@@ -248,7 +276,6 @@ typedef enum {
  *
  * https://tools.ietf.org/html/rfc5389#section-15
  * https://tools.ietf.org/html/rfc3489#section-11.2
- *
  */
 typedef struct {
     UINT16 stunMessageType;
@@ -404,43 +431,63 @@ typedef struct {
  *
  * @return STATUS status of execution.
  */
-STATUS serializeStunPacket(PStunPacket pStunPacket, PBYTE password, UINT32 passwordLen, BOOL generateMessageIntegrity, BOOL generateFingerprint,
-                           PBYTE pBuffer, PUINT32 pSize);
-STATUS deserializeStunPacket(PBYTE, UINT32, PBYTE, UINT32, PStunPacket*);
-STATUS freeStunPacket(PStunPacket*);
-STATUS createStunPacket(STUN_PACKET_TYPE stunPacketType, PBYTE transactionId, PStunPacket* ppStunPacket);
-STATUS appendStunAddressAttribute(PStunPacket, STUN_ATTRIBUTE_TYPE, PKvsIpAddress);
-STATUS appendStunUsernameAttribute(PStunPacket, PCHAR);
-STATUS appendStunFlagAttribute(PStunPacket, STUN_ATTRIBUTE_TYPE);
-STATUS appendStunPriorityAttribute(PStunPacket, UINT32);
-STATUS appendStunLifetimeAttribute(PStunPacket, UINT32);
-STATUS appendStunRequestedTransportAttribute(PStunPacket, UINT8);
-STATUS appendStunRealmAttribute(PStunPacket, PCHAR);
-STATUS appendStunNonceAttribute(PStunPacket, PBYTE, UINT16);
-STATUS updateStunNonceAttribute(PStunPacket, PBYTE, UINT16);
-STATUS appendStunErrorCodeAttribute(PStunPacket, PCHAR, UINT16);
-STATUS appendStunIceControllAttribute(PStunPacket, STUN_ATTRIBUTE_TYPE, UINT64);
-STATUS appendStunDataAttribute(PStunPacket, PBYTE, UINT16);
-STATUS appendStunChannelNumberAttribute(PStunPacket, UINT16);
-STATUS appendStunChangeRequestAttribute(PStunPacket, UINT32);
+STATUS stun_serializePacket(PStunPacket pStunPacket, PBYTE password, UINT32 passwordLen, BOOL generateMessageIntegrity, BOOL generateFingerprint,
+                            PBYTE pBuffer, PUINT32 pSize);
+/**
+ * @brief
+ *
+ * @param[in] pStunBuffer
+ * @param[in] bufferSize
+ * @param[in] password
+ * @param[in] passwordLen
+ * @param[in, out] ppStunPacket
+ *
+ * @return STATUS status of execution.
+ */
+STATUS stun_deserializePacket(PBYTE pStunBuffer, UINT32 bufferSize, PBYTE password, UINT32 passwordLen, PStunPacket* ppStunPacket);
+STATUS stun_freePacket(PStunPacket*);
+/**
+ * @brief create the stun packet.
+ *
+ * @param[in] stunPacketType the stun packet type.
+ * @param[in] transactionId the tranction id.
+ * @param[in, out] ppStunPacket return the buffer of the stun packet.
+ *
+ * @return STATUS status of execution.
+ */
+STATUS stun_createPacket(STUN_PACKET_TYPE stunPacketType, PBYTE transactionId, PStunPacket* ppStunPacket);
+STATUS stun_attribute_appendAddress(PStunPacket, STUN_ATTRIBUTE_TYPE, PKvsIpAddress);
+STATUS stun_attribute_appendUsername(PStunPacket, PCHAR);
+STATUS stun_attribute_appendFlag(PStunPacket, STUN_ATTRIBUTE_TYPE);
+STATUS stun_attribute_appendPriority(PStunPacket, UINT32);
+STATUS stun_attribute_appendLifetime(PStunPacket, UINT32);
+STATUS stun_attribute_appendRequestedTransport(PStunPacket, UINT8);
+STATUS stun_attribute_appendRealm(PStunPacket, PCHAR);
+STATUS stun_attribute_appendNonce(PStunPacket, PBYTE, UINT16);
+STATUS stun_attribute_updateNonce(PStunPacket, PBYTE, UINT16);
+STATUS stun_attribute_appendErrorCode(PStunPacket, PCHAR, UINT16);
+STATUS stun_attribute_appendIceControlMode(PStunPacket, STUN_ATTRIBUTE_TYPE, UINT64);
+STATUS stun_attribute_appendData(PStunPacket, PBYTE, UINT16);
+STATUS stun_attribute_appendChannelNumber(PStunPacket, UINT16);
+STATUS stun_attribute_appendChangeRequest(PStunPacket, UINT32);
 
 /**
  * check if PStunPacket has an attribute of type STUN_ATTRIBUTE_TYPE. If so, return the first occurrence through
  * PStunAttributeHeader*
  * @return STATUS of operations
  */
-STATUS getStunAttribute(PStunPacket, STUN_ATTRIBUTE_TYPE, PStunAttributeHeader*);
+STATUS stun_attribute_getByType(PStunPacket, STUN_ATTRIBUTE_TYPE, PStunAttributeHeader*);
 
 /**
  * xor an ip address in place
  */
-STATUS xorIpAddress(PKvsIpAddress, PBYTE);
+STATUS stun_xorIpAddress(PKvsIpAddress, PBYTE);
 //
 // Internal functions
 //
-STATUS stunPackageIpAddr(PStunHeader, STUN_ATTRIBUTE_TYPE, PKvsIpAddress, PBYTE, PUINT32);
-UINT16 getPackagedStunAttributeSize(PStunAttributeHeader);
-STATUS getFirstAvailableStunAttribute(PStunPacket, PStunAttributeHeader*);
+STATUS stun_packIpAddr(PStunHeader, STUN_ATTRIBUTE_TYPE, PKvsIpAddress, PBYTE, PUINT32);
+UINT16 stun_attribute_getPackedSize(PStunAttributeHeader);
+STATUS stun_attribute_getFirstAvailability(PStunPacket, PStunAttributeHeader*);
 
 #ifdef __cplusplus
 }

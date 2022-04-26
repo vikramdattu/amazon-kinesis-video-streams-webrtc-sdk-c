@@ -23,6 +23,12 @@ extern "C" {
 /******************************************************************************
  * HEADERS
  ******************************************************************************/
+#include "kvs/platform_utils.h"
+#include "time_port.h"
+
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 #define IOT_REQUEST_CONNECTION_TIMEOUT (3 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define IOT_REQUEST_COMPLETION_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define ROLE_ALIASES_PATH              ((PCHAR) "/role-aliases")
@@ -87,7 +93,7 @@ typedef struct __IotCredentialProvider {
  *
  * @return STATUS code of the execution.
  */
-STATUS createIotCredentialProvider(PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PAwsCredentialProvider*);
+STATUS iot_credential_provider_create(PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PAwsCredentialProvider*);
 
 /**
  * Frees an IoT based Aws credential provider object
@@ -96,7 +102,7 @@ STATUS createIotCredentialProvider(PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PAw
  *
  * @return STATUS code of the execution.
  */
-STATUS freeIotCredentialProvider(PAwsCredentialProvider*);
+STATUS iot_credential_provider_free(PAwsCredentialProvider*);
 #ifdef __cplusplus
 }
 #endif

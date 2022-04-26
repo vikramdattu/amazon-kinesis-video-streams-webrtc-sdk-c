@@ -1,6 +1,17 @@
-/*******************************************
-HostInfo internal include file
-*******************************************/
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
 #ifndef __KINESIS_VIDEO_WEBRTC_CLIENT_NETWORK__
 #define __KINESIS_VIDEO_WEBRTC_CLIENT_NETWORK__
 
@@ -11,7 +22,7 @@ extern "C" {
 #endif
 
 #include "kvs/common_defs.h"
-#include "kvs/WebRTCClient.h"
+#include "kvs/webrtc_client.h"
 #include "endianness.h"
 
 #define MAX_LOCAL_NETWORK_INTERFACE_COUNT 128
@@ -45,6 +56,8 @@ extern "C" {
 
 #define MAX_UDP_PACKET_SIZE 65507
 
+#define IS_IPV4_ADDR(pAddress) ((pAddress)->family == KVS_IP_FAMILY_TYPE_IPV4)
+
 typedef enum {
     KVS_SOCKET_PROTOCOL_NONE,
     KVS_SOCKET_PROTOCOL_TCP,
@@ -64,33 +77,35 @@ typedef struct {
 } KvsIpAddress, *PKvsIpAddress;
 
 /**
- * @param - PKvsIpAddress - IN/OUT - array for getLocalhostIpAddresses to store any local ips it found. The ip address and port
- *                                   will be in network byte order.
- * @param - UINT32 - IN/OUT - length of the array, upon return it will be updated to the actual number of ips in the array
+ * @brief
  *
- *@param - IceSetInterfaceFilterFunc - IN - set to custom interface filter callback
+ * @param[in, out] destIpList array for net_getLocalhostIpAddresses to store any local ips it found. The ip address and port will be in network byte
+ * order.
+ * @param[in, out] pDestIpListLen length of the array, upon return it will be updated to the actual number of ips in the array
+ * @param[in] filter set to custom interface filter callback
+ * @param[in] customData Set to custom data that can be used in the callback later
  *
- *@param - UINT64 - IN - Set to custom data that can be used in the callback later
- * @return - STATUS status of execution
+ * @return STATUS status of execution.
  */
-STATUS getLocalhostIpAddresses(PKvsIpAddress, PUINT32, IceSetInterfaceFilterFunc, UINT64);
-
+STATUS net_getLocalhostIpAddresses(PKvsIpAddress destIpList, PUINT32 pDestIpListLen, IceSetInterfaceFilterFunc filter, UINT64 customData);
 /**
+ * @brief
+ *
  * @param[in] familyType Family for the socket. Must be one of KVS_IP_FAMILY_TYPE
  * @param[in] protocol either tcp or udp
  * @param[in] sendBufSize send buffer size in bytes
  * @param[in] pOutSockFd for the socketfd
  *
- * @return - STATUS status of execution
+ * @return STATUS status of execution.
  */
-STATUS createSocket(KVS_IP_FAMILY_TYPE familyType, KVS_SOCKET_PROTOCOL protocol, UINT32 sendBufSize, PINT32 pOutSockFd);
+STATUS net_createSocket(KVS_IP_FAMILY_TYPE familyType, KVS_SOCKET_PROTOCOL protocol, UINT32 sendBufSize, PINT32 pOutSockFd);
 
 /**
  * @param - INT32 - IN - INT32 for the socketfd
  *
  * @return - STATUS status of execution
  */
-STATUS closeSocket(INT32);
+STATUS net_closeSocket(INT32);
 
 /**
  * @param - PKvsIpAddress - IN - address for the socket to bind. PKvsIpAddress->port will be changed to the actual port number
@@ -98,7 +113,7 @@ STATUS closeSocket(INT32);
  *
  * @return - STATUS status of execution
  */
-STATUS socketBind(PKvsIpAddress, INT32);
+STATUS net_bindSocket(PKvsIpAddress, INT32);
 
 /**
  * @param - PKvsIpAddress - IN - address for the socket to connect.
@@ -106,7 +121,7 @@ STATUS socketBind(PKvsIpAddress, INT32);
  *
  * @return - STATUS status of execution
  */
-STATUS socketConnect(PKvsIpAddress, INT32);
+STATUS net_connectSocket(PKvsIpAddress, INT32);
 
 /**
  * @param - PCHAR - IN - hostname to resolve
@@ -115,23 +130,24 @@ STATUS socketConnect(PKvsIpAddress, INT32);
  *
  * @return - STATUS status of execution
  */
-STATUS getIpWithHostName(PCHAR, PKvsIpAddress);
+STATUS net_getIpByHostName(PCHAR, PKvsIpAddress);
 
-STATUS getIpAddrStr(PKvsIpAddress, PCHAR, UINT32);
+STATUS net_getIpAddrStr(PKvsIpAddress, PCHAR, UINT32);
 
-BOOL isSameIpAddress(PKvsIpAddress, PKvsIpAddress, BOOL);
+BOOL net_compareIpAddress(PKvsIpAddress, PKvsIpAddress, BOOL);
 
 /**
  * @return - INT32 error code
  */
-INT32 getErrorCode(VOID);
+INT32 net_getErrorCode(VOID);
 
 /**
  * @param - INT32 - IN - error code
  *
  * @return - PCHAR string associated with error code
  */
-PCHAR getErrorString(INT32);
+PCHAR net_getErrorString(INT32);
+PCHAR net_getGaiStrRrror(INT32 error);
 
 #ifdef __cplusplus
 }

@@ -12,29 +12,11 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
-#ifndef __AWS_KVS_WEBRTC_BASE64_INCLUDE__
-#define __AWS_KVS_WEBRTC_BASE64_INCLUDE__
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 /******************************************************************************
  * HEADERS
  ******************************************************************************/
-#include "kvs/common_defs.h"
-/******************************************************************************
- * DEFINITIONS
- ******************************************************************************/
-/******************************************************************************
- * FUNCTIONS
- ******************************************************************************/
-/**
- * Base64 encode/decode functionality
- */
-STATUS base64Encode(PVOID, UINT32, PCHAR, PUINT32);
-STATUS base64Decode(PCHAR, UINT32, PBYTE, PUINT32);
+#include "kvs/config.h"
 
-#ifdef __cplusplus
-}
-#endif
-#endif /* __AWS_KVS_WEBRTC_BASE64_INCLUDE__ */
+/******************************************************************************
+ * FUNCTION
+ ******************************************************************************/

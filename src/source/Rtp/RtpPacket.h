@@ -1,6 +1,17 @@
-/*******************************************
-RTP Packet include file
-*******************************************/
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
 #ifndef __KINESIS_VIDEO_WEBRTC_CLIENT_RTP_RTPPACKET_H
 #define __KINESIS_VIDEO_WEBRTC_CLIENT_RTP_RTPPACKET_H
 
@@ -9,7 +20,15 @@ RTP Packet include file
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
+#include "kvs/error.h"
+#include "kvs/common_defs.h"
+#include "kvs/platform_utils.h"
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 #define MIN_HEADER_LENGTH 12
 #define VERSION_SHIFT     6
 #define VERSION_MASK      0x3
@@ -51,7 +70,7 @@ typedef STATUS (*DepayRtpPayloadFunc)(PBYTE, UINT32, PBYTE, PUINT32, PBOOL);
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
 
-struct __RtpPacketHeader {
+typedef struct __RtpPacketHeader {
     UINT8 version;
     BOOL padding;
     BOOL extension;
@@ -65,23 +84,18 @@ struct __RtpPacketHeader {
     UINT16 extensionProfile;
     PBYTE extensionPayload;
     UINT32 extensionLength;
-};
-typedef struct __RtpPacketHeader RtpPacketHeader;
-typedef RtpPacketHeader* PRtpPacketHeader;
+} RtpPacketHeader, *PRtpPacketHeader;
 
-struct __Payloads {
+typedef struct __Payloads {
     PBYTE payloadBuffer;
     UINT32 payloadLength;
     UINT32 maxPayloadLength;
     PUINT32 payloadSubLength;
     UINT32 payloadSubLenSize;
     UINT32 maxPayloadSubLenSize;
-};
-typedef struct __Payloads PayloadArray;
-typedef PayloadArray* PPayloadArray;
+} PayloadArray, *PPayloadArray;
 
-typedef struct __RtpPacket RtpPacket;
-struct __RtpPacket {
+typedef struct __RtpPacket {
     RtpPacketHeader header;
     PBYTE payload;
     UINT32 payloadLength;
@@ -89,18 +103,29 @@ struct __RtpPacket {
     UINT32 rawPacketLength;
     // used for jitterBufferDelay calculation
     UINT64 receivedTime;
-};
-typedef RtpPacket* PRtpPacket;
+} RtpPacket, *PRtpPacket;
 
-STATUS createRtpPacket(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket*);
-STATUS setRtpPacket(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket);
-STATUS freeRtpPacket(PRtpPacket*);
-STATUS createRtpPacketFromBytes(PBYTE, UINT32, PRtpPacket*);
-STATUS constructRetransmitRtpPacketFromBytes(PBYTE, UINT32, UINT16, UINT8, UINT32, PRtpPacket*);
-STATUS setRtpPacketFromBytes(PBYTE, UINT32, PRtpPacket);
-STATUS createBytesFromRtpPacket(PRtpPacket, PBYTE, PUINT32);
-STATUS setBytesFromRtpPacket(PRtpPacket, PBYTE, UINT32);
-STATUS constructRtpPackets(PPayloadArray, UINT8, UINT16, UINT32, UINT32, PRtpPacket, UINT32);
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
+STATUS rtp_packet_create(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket*);
+STATUS rtp_packet_set(UINT8, BOOL, BOOL, UINT8, BOOL, UINT8, UINT16, UINT32, UINT32, PUINT32, UINT16, UINT32, PBYTE, PBYTE, UINT32, PRtpPacket);
+STATUS rtp_packet_free(PRtpPacket*);
+/**
+ * @brief send packets to the corresponding rtp receiver.
+ *
+ * @param[in] pKvsPeerConnection the user context.
+ * @param[in] pBuffer the address of packet.
+ * @param[in, out] bufferLen the length of packet.
+ *
+ * @return STATUS status of execution
+ */
+STATUS rtp_packet_createFromBytes(PBYTE, UINT32, PRtpPacket*);
+STATUS rtp_packet_constructRetransmitPacketFromBytes(PBYTE, UINT32, UINT16, UINT8, UINT32, PRtpPacket*);
+STATUS rtp_packet_setPacketFromBytes(PBYTE, UINT32, PRtpPacket);
+STATUS rtp_packet_createBytesFromPacket(PRtpPacket, PBYTE, PUINT32);
+STATUS rtp_packet_setBytesFromPacket(PRtpPacket, PBYTE, UINT32);
+STATUS rtp_packet_constructPackets(PPayloadArray, UINT8, UINT16, UINT32, UINT32, PRtpPacket, UINT32);
 
 #ifdef __cplusplus
 }
