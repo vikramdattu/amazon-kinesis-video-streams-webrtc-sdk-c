@@ -38,7 +38,7 @@
 /******************************************************************************
  * DEFINITIONS
  ******************************************************************************/
-#define DEFAULT_CONNECTION_TIMEOUT_MS (10 * 1000)
+#define DEFAULT_CONNECTION_TIMEOUT_MS (5 * 1000)
 
 typedef struct NetIo {
     /* Basic ssl connection parameters */

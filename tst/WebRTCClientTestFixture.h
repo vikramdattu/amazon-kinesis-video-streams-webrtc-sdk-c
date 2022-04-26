@@ -107,7 +107,7 @@ class WebRtcClientTestBase : public ::testing::Test {
         }
 
         retStatus = signalingClientCreate(&clientInfo, &channelInfo, &signalingClientCallbacks,
-                                              pCredentialProvider != NULL ? pCredentialProvider : mTestCredentialProvider, &mSignalingClientHandle);
+                                          pCredentialProvider != NULL ? pCredentialProvider : mTestCredentialProvider, &mSignalingClientHandle);
 
         if (mAccessKeyIdSet) {
             EXPECT_EQ(STATUS_SUCCESS, retStatus);
@@ -126,7 +126,7 @@ class WebRtcClientTestBase : public ::testing::Test {
             lwsDeleteChannel(FROM_SIGNALING_CLIENT_HANDLE(mSignalingClientHandle), 0);
         }
 
-        EXPECT_EQ(STATUS_SUCCESS, signalingClientFree(&mSignalingClientHandle));
+        EXPECT_EQ(STATUS_SUCCESS, signaling_client_free(&mSignalingClientHandle));
 
         return STATUS_SUCCESS;
     }
@@ -142,7 +142,7 @@ class WebRtcClientTestBase : public ::testing::Test {
             base->mFrame = NULL;
         }
         base->mFrame = (PBYTE) MEMALLOC(frameSize);
-        EXPECT_EQ(STATUS_SUCCESS, jitterBufferFillFrameData(base->mJitterBuffer, base->mFrame, frameSize, &filledSize, startIndex, endIndex));
+        EXPECT_EQ(STATUS_SUCCESS, jitter_buffer_fillFrameData(base->mJitterBuffer, base->mFrame, frameSize, &filledSize, startIndex, endIndex));
         EXPECT_EQ(frameSize, filledSize);
         EXPECT_EQ(0, MEMCMP(base->mPExpectedFrameArr[base->mReadyFrameIndex], base->mFrame, frameSize));
         base->mReadyFrameIndex++;
@@ -207,8 +207,8 @@ class WebRtcClientTestBase : public ::testing::Test {
         SNPRINTF(filePath, MAX_PATH_LEN, "%s/frame-%04d.h264", frameFilePath, index);
 
         // Get the size and read into frame
-        CHK_STATUS(readFile(filePath, TRUE, NULL, &size));
-        CHK_STATUS(readFile(filePath, TRUE, pFrame, &size));
+        CHK_STATUS(fileio_read(filePath, TRUE, NULL, &size));
+        CHK_STATUS(fileio_read(filePath, TRUE, pFrame, &size));
 
         *pSize = (UINT32) size;
 

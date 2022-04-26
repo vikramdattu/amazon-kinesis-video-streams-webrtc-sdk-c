@@ -1,19 +1,32 @@
-//
-// Common definition file
-//
-
-#ifndef __COMMON_DEFINITIONS__
-#define __COMMON_DEFINITIONS__
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+#ifndef __AWS_KVS_WEBRTC_COMMON_DEFINITIONS_INCLUDE__
+#define __AWS_KVS_WEBRTC_COMMON_DEFINITIONS_INCLUDE__
 
 #pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 
-////////////////////////////////////////////////////
-// Project defines
-////////////////////////////////////////////////////
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 #if defined _WIN32 || defined __CYGWIN__
 #if defined __GNUC__ || defined __GNUG__
 #define INLINE     inline
@@ -205,65 +218,6 @@ typedef FLOAT* PFLOAT;
 #define TRUE 1
 #endif
 
-// Thread Id
-typedef UINT64 TID;
-typedef TID* PTID;
-
-#ifndef INVALID_TID_VALUE
-#define INVALID_TID_VALUE ((UINT64) NULL)
-#endif
-
-#ifndef IS_VALID_TID_VALUE
-#define IS_VALID_TID_VALUE(t) ((t) != INVALID_TID_VALUE)
-#endif
-
-// Mutex typedef
-typedef UINT64 MUTEX;
-
-#ifndef INVALID_MUTEX_VALUE
-#define INVALID_MUTEX_VALUE ((UINT64) NULL)
-#endif
-
-#ifndef IS_VALID_MUTEX_VALUE
-#define IS_VALID_MUTEX_VALUE(m) ((m) != INVALID_MUTEX_VALUE)
-#endif
-
-// Conditional variable
-#if defined __WINDOWS_BUILD__
-typedef PCONDITION_VARIABLE CVAR;
-#else
-#include <pthread.h>
-#include <signal.h>
-#if defined(KVS_PLAT_ESP_FREERTOS)
-#include <esp_pthread.h>
-#include "esp_heap_caps.h"
-#include "esp_system.h"
-#endif
-typedef pthread_cond_t* CVAR;
-#endif
-
-#ifndef INVALID_CVAR_VALUE
-#define INVALID_CVAR_VALUE ((CVAR) NULL)
-#endif
-
-#ifndef IS_VALID_CVAR_VALUE
-#define IS_VALID_CVAR_VALUE(c) ((c) != INVALID_CVAR_VALUE)
-#endif
-
-// Max thread name buffer length - similar to Linux platforms
-#ifndef MAX_THREAD_NAME
-#define MAX_THREAD_NAME 16
-#endif
-
-// Max mutex name
-#ifndef MAX_MUTEX_NAME
-#define MAX_MUTEX_NAME 32
-#endif
-
-// Content ID - 64 bit uint
-typedef UINT64 CID;
-typedef CID* PCID;
-
 //
 // int and long ptr definitions
 //
@@ -373,20 +327,9 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
 #define MAX_INT64  ((INT64) 0x7fffffffffffffff)
 #define MIN_INT64  ((INT64) 0x8000000000000000)
 
-//
-// NOTE: Timer precision is in 100ns intervals. This is used in heuristics and in time functionality
-//
-#define DEFAULT_TIME_UNIT_IN_NANOS         100
-#define HUNDREDS_OF_NANOS_IN_A_MICROSECOND 10LL
-#define HUNDREDS_OF_NANOS_IN_A_MILLISECOND (HUNDREDS_OF_NANOS_IN_A_MICROSECOND * 1000LL)
-#define HUNDREDS_OF_NANOS_IN_A_SECOND      (HUNDREDS_OF_NANOS_IN_A_MILLISECOND * 1000LL)
-#define HUNDREDS_OF_NANOS_IN_A_MINUTE      (HUNDREDS_OF_NANOS_IN_A_SECOND * 60LL)
-#define HUNDREDS_OF_NANOS_IN_AN_HOUR       (HUNDREDS_OF_NANOS_IN_A_MINUTE * 60LL)
-
-//
-// Infinite time
-//
-#define INFINITE_TIME_VALUE MAX_UINT64
+#ifndef STATUS
+#define STATUS UINT32
+#endif
 
 //
 // Some standard definitions/macros
@@ -413,16 +356,6 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof *(array))
 #endif
 
-#ifndef SAFE_MEMFREE
-#define SAFE_MEMFREE(p)                                                                                                                              \
-    do {                                                                                                                                             \
-        if (p) {                                                                                                                                     \
-            MEMFREE(p);                                                                                                                              \
-            (p) = NULL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
-#endif
-
 #ifndef SAFE_DELETE
 #define SAFE_DELETE(p)                                                                                                                               \
     do {                                                                                                                                             \
@@ -443,18 +376,6 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
     } while (0)
 #endif
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef MAX
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef ABS
-#define ABS(a) ((a) > (0) ? (a) : (-a))
-#endif
-
 #ifndef IS_ALIGNED_TO
 #define IS_ALIGNED_TO(m, n) ((m) % (n) == 0)
 #endif
@@ -466,23 +387,21 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
 #include "kvs/error.h"
 
 #include <stdlib.h>
-#include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <errno.h>
+
 #include <ctype.h>
-#include <time.h>
+#define TOLOWER    tolower
+#define TOUPPER    toupper
+#define TOLOWERSTR tolowerstr
+#define TOUPPERSTR toupperstr
 
 #if !(defined _WIN32 || defined _WIN64)
 #include <unistd.h>
-#include <dirent.h>
+//#include <dirent.h>
 #include <sys/time.h>
-#endif
-
-#if !defined(_MSC_VER) && !defined(__MINGW64__) && !defined(__MINGW32__) && !defined(__MACH__)
-// NOTE!!! For some reason memalign is not included for Linux builds in stdlib.h
-#include <malloc.h>
 #endif
 
 #if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
@@ -490,15 +409,15 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
 // Definition of the helper stats check macros for Windows
 #ifndef S_ISLNK
 #define S_ISLNK(mode) FALSE
-#endif
+#endif //!< S_ISLNK
 
 #ifndef S_ISDIR
 #define S_ISDIR(mode) (((mode) &S_IFMT) == S_IFDIR)
-#endif
+#endif //!< S_ISDIR
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) &S_IFMT) == S_IFREG)
-#endif
+#endif //!< S_ISREG
 
 // Definition of the mkdir for Windows with 1 param
 #define GLOBAL_MKDIR(p1, p2) _mkdir(p1)
@@ -513,27 +432,22 @@ typedef INT_PTR SSIZE_T, *PSSIZE_T;
 
 // Typedef stat structure
 typedef struct stat STAT_STRUCT;
-#else
+#else //!<#if defined(__MINGW64__) || defined(__MINGW32__)
 // Definition of posix APIs for Windows
 #define GLOBAL_RMDIR _rmdir
 #define GLOBAL_STAT  _stat
 
 // Typedef stat structure
 typedef struct _stat STAT_STRUCT;
-#endif
+#endif //!<#if defined(__MINGW64__) || defined(__MINGW32__)
 
-// Definition of the static initializers
-#define GLOBAL_MUTEX_INIT           MUTEX_CREATE(FALSE)
-#define GLOBAL_MUTEX_INIT_RECURSIVE MUTEX_CREATE(TRUE)
-#define GLOBAL_CVAR_INIT            CVAR_CREATE()
-
-#else
+#else //!< #if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
 
 #if !defined(__MACH__)
 #ifdef KVSPIC_HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
-#endif
-#endif
+#endif //!< #ifdef KVSPIC_HAVE_SYS_PRCTL_H
+#endif //!< #if !defined(__MACH__)
 
 // Definition of the mkdir for non-Windows platforms with 2 params
 #define GLOBAL_MKDIR(p1, p2) mkdir((p1), (p2))
@@ -549,269 +463,21 @@ typedef struct _stat STAT_STRUCT;
 // Typedef stat structure
 typedef struct stat STAT_STRUCT;
 
-// NOTE!!! Some of the libraries don't have a definition of PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+#endif //!< #if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
 
-#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
-#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP                                                                                                       \
-    {                                                                                                                                                \
-        {                                                                                                                                            \
-            PTHREAD_MUTEX_RECURSIVE                                                                                                                  \
-        }                                                                                                                                            \
-    }
-#endif
-
-#define GLOBAL_MUTEX_INIT_RECURSIVE PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
-#else
-#define GLOBAL_MUTEX_INIT_RECURSIVE PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-#endif
-
-#define GLOBAL_MUTEX_INIT PTHREAD_MUTEX_INITIALIZER
-#define GLOBAL_CVAR_INIT  PTHREAD_COND_INITIALIZER
-
-#endif
-
-//
-// Allocator function definitions
-//
-typedef PVOID (*memAlloc)(SIZE_T size);
-typedef PVOID (*memAlignAlloc)(SIZE_T size, SIZE_T alignment);
-typedef PVOID (*memCalloc)(SIZE_T num, SIZE_T size);
-typedef PVOID (*memRealloc)(PVOID ptr, SIZE_T size);
-typedef VOID (*memFree)(PVOID ptr);
-
-typedef BOOL (*memChk)(PVOID ptr, BYTE val, SIZE_T size);
-
-//
-// Default allocator functions
-//
-INLINE PVOID defaultMemAlloc(SIZE_T size);
-INLINE PVOID defaultMemAlignAlloc(SIZE_T size, SIZE_T alignment);
-INLINE PVOID defaultMemCalloc(SIZE_T num, SIZE_T size);
-INLINE PVOID defaultMemRealloc(PVOID ptr, SIZE_T size);
-INLINE VOID defaultMemFree(VOID* ptr);
-
-//
-// Global allocator function pointers
-//
-extern memAlloc globalMemAlloc;
-extern memAlignAlloc globalMemAlignAlloc;
-extern memCalloc globalMemCalloc;
-extern memRealloc globalMemRealloc;
-extern memFree globalMemFree;
-
-extern memChk globalMemChk;
-
-//
-// Thread library function definitions
-//
-typedef TID (*getTId)();
-typedef STATUS (*getTName)(TID, PCHAR, UINT32);
-
-//
-// Thread related functionality
-//
-extern getTId globalGetThreadId;
-extern getTName globalGetThreadName;
-
-//
-// Time library function definitions
-//
-typedef UINT64 (*getTime)();
-
-//
-// Default time library functions
-//
-#define TIME_DIFF_UNIX_WINDOWS_TIME 116444736000000000ULL
-
-PUBLIC_API INLINE UINT64 defaultGetTime();
-
-//
-// Thread related functionality
-//
-extern getTime globalGetTime;
-extern getTime globalGetRealTime;
-
-//
-// Thread library function definitions
-//
-typedef PVOID (*startRoutine)(PVOID);
-typedef MUTEX (*createMutex)(BOOL);
-typedef VOID (*lockMutex)(MUTEX);
-typedef VOID (*unlockMutex)(MUTEX);
-typedef BOOL (*tryLockMutex)(MUTEX);
-typedef BOOL (*waitLockMutex)(MUTEX, UINT64);
-typedef VOID (*freeMutex)(MUTEX);
-typedef STATUS (*createThread)(PTID, startRoutine, PVOID);
-typedef STATUS (*createThreadEx)(PTID, PCHAR threadName, UINT32 threadSize, startRoutine, PVOID);
-typedef STATUS (*joinThread)(TID, PVOID*);
-typedef VOID (*threadSleep)(UINT64);
-typedef VOID (*threadSleepUntil)(UINT64);
-typedef STATUS (*cancelThread)(TID);
-typedef STATUS (*detachThread)(TID);
-typedef VOID (*exitThread)(PVOID);
-typedef CVAR (*createConditionVariable)();
-typedef STATUS (*signalConditionVariable)(CVAR);
-typedef STATUS (*broadcastConditionVariable)(CVAR);
-typedef STATUS (*waitConditionVariable)(CVAR, MUTEX, UINT64);
-typedef VOID (*freeConditionVariable)(CVAR);
-
-//
-// Version functions
-//
-typedef STATUS (*getPlatformName)(PCHAR, UINT32);
-typedef STATUS (*getOsVersion)(PCHAR, UINT32);
-typedef STATUS (*getCompilerInfo)(PCHAR, UINT32);
-
-//
-// Atomics functions
-//
-typedef SIZE_T (*atomicLoad)(volatile SIZE_T*);
-typedef VOID (*atomicStore)(volatile SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicExchange)(volatile SIZE_T*, SIZE_T);
-typedef BOOL (*atomicCompareExchange)(volatile SIZE_T*, SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicIncrement)(volatile SIZE_T*);
-typedef SIZE_T (*atomicDecrement)(volatile SIZE_T*);
-typedef SIZE_T (*atomicAdd)(volatile SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicSubtract)(volatile SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicAnd)(volatile SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicOr)(volatile SIZE_T*, SIZE_T);
-typedef SIZE_T (*atomicXor)(volatile SIZE_T*, SIZE_T);
-
-//
-// Thread and Mutex related functionality
-//
-extern createMutex globalCreateMutex;
-extern lockMutex globalLockMutex;
-extern unlockMutex globalUnlockMutex;
-extern tryLockMutex globalTryLockMutex;
-extern waitLockMutex globalWaitLockMutex;
-extern freeMutex globalFreeMutex;
-extern createThread globalCreateThread;
-extern createThreadEx globalCreateThreadEx;
-extern joinThread globalJoinThread;
-extern threadSleep globalThreadSleep;
-extern threadSleepUntil globalThreadSleepUntil;
-extern cancelThread globalCancelThread;
-extern detachThread globalDetachThread;
-extern exitThread globalExitThread;
-extern createConditionVariable globalConditionVariableCreate;
-extern signalConditionVariable globalConditionVariableSignal;
-extern broadcastConditionVariable globalConditionVariableBroadcast;
-extern waitConditionVariable globalConditionVariableWait;
-extern freeConditionVariable globalConditionVariableFree;
-
-//
-// Version information
-//
-extern getPlatformName globalGetPlatformName;
-extern getOsVersion globalGetOsVersion;
-extern getCompilerInfo globalGetCompilerInfo;
-
-//
-// Atomics
-//
-extern PUBLIC_API atomicLoad globalAtomicLoad;
-extern PUBLIC_API atomicStore globalAtomicStore;
-extern PUBLIC_API atomicExchange globalAtomicExchange;
-extern PUBLIC_API atomicCompareExchange globalAtomicCompareExchange;
-extern PUBLIC_API atomicIncrement globalAtomicIncrement;
-extern PUBLIC_API atomicDecrement globalAtomicDecrement;
-extern PUBLIC_API atomicAdd globalAtomicAdd;
-extern PUBLIC_API atomicSubtract globalAtomicSubtract;
-extern PUBLIC_API atomicAnd globalAtomicAnd;
-extern PUBLIC_API atomicOr globalAtomicOr;
-extern PUBLIC_API atomicXor globalAtomicXor;
-
-// Max string length for platform name
-#define MAX_PLATFORM_NAME_STRING_LEN 128
-
-// Max string length for the OS version
-#define MAX_OS_VERSION_STRING_LEN 128
-
-// Max string length for the compiler info
-#define MAX_COMPILER_INFO_STRING_LEN 128
-
-//
-// Version macros
-//
-#define GET_PLATFORM_NAME globalGetPlatformName
-#define GET_OS_VERSION    globalGetOsVersion
-#define GET_COMPILER_INFO globalGetCompilerInfo
-
-//
-// Memory allocation and operations
-//
-#define MEMALLOC      globalMemAlloc
-#define MEMALIGNALLOC globalMemAlignAlloc
-#define MEMCALLOC     globalMemCalloc
-#define MEMREALLOC    globalMemRealloc
-#define MEMFREE       globalMemFree
-#define MEMCMP        memcmp
-#ifndef MEMCPY
-#define MEMCPY memcpy
-#endif
-#define MEMSET memset
-#ifndef MEMMOVE
-#define MEMMOVE memmove
-#endif
-#define REALLOC realloc
-
-//
-// Whether the buffer contains the same char
-//
-#define MEMCHK globalMemChk
-
+#include "allocators.h"
+#include "time_port.h"
+#include "thread.h"
+#include "mutex.h"
+#include "version.h"
+#include "atomics.h"
 #include "kvs_string.h"
-//
-// String operations
-//
-#define STRCAT     strcat
-#define STRNCAT    strncat
-#define STRCPY     strcpy
-#define STRNCPY    strncpy
-#define STRLEN     strlen
-#define STRNLEN    strnlen
-#define STRCHR     strchr
-#define STRNCHR    strnchr
-#define STRRCHR    strrchr
-#define STRCMP     strcmp
-#define STRCMPI    GLOBAL_STRCMPI
-#define STRNCMPI   GLOBAL_STRNCMPI
-#define STRNCMP    strncmp
-#define PRINTF     printf
-#define SPRINTF    sprintf
-#define SNPRINTF   snprintf
-#define TRIMSTRALL trimstrall
-#define LTRIMSTR   ltrimstr
-#define RTRIMSTR   rtrimstr
-#define STRSTR     strstr
-#ifdef strnstr
-#define STRNSTR strnstr
-#else
-#define STRNSTR defaultStrnstr
-#endif
-#define TOLOWER    tolower
-#define TOUPPER    toupper
-#define TOLOWERSTR tolowerstr
-#define TOUPPERSTR toupperstr
-
-#define MKTIME mktime
+#include "endianness.h"
 
 //
 // Environment variables
 //
 #define GETENV getenv
-
-//
-// Empty string definition
-//
-#define EMPTY_STRING ((PCHAR) "")
-
-//
-// Check if string is empty
-//
-#define IS_EMPTY_STRING(str) ((str)[0] == '\0')
 
 //
 // Pseudo-random functionality
@@ -822,13 +488,6 @@ extern PUBLIC_API atomicXor globalAtomicXor;
 #ifndef RAND
 #define RAND rand
 #endif
-
-//
-// CRT functionality
-//
-#define STRTOUL  strtoul
-#define ULLTOSTR ulltostr
-#define ULTOSTR  ultostr
 
 //
 // File operations
@@ -901,92 +560,18 @@ extern PUBLIC_API atomicXor globalAtomicXor;
 #define FPATHSEPARATOR     '/'
 #define FPATHSEPARATOR_STR "/"
 #endif
-//
-// String to integer conversion
-//
-#define STRTOUI32 strtoui32
-#define STRTOI32  strtoi32
-#define STRTOUI64 strtoui64
-#define STRTOI64  strtoi64
 
-//
-// Thread functionality
-//
-#define GETTID   globalGetThreadId
-#define GETTNAME globalGetThreadName
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
-//
-// Time functionality
-//
-#define GETTIME     globalGetTime
-#define GETREALTIME globalGetRealTime
-#define STRFTIME    strftime
-#define GMTIME      gmtime
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
-//
-// Mutex functionality
-//
-#define MUTEX_CREATE   globalCreateMutex
-#define MUTEX_LOCK     globalLockMutex
-#define MUTEX_UNLOCK   globalUnlockMutex
-#define MUTEX_TRYLOCK  globalTryLockMutex
-#define MUTEX_WAITLOCK globalWaitLockMutex
-#define MUTEX_FREE     globalFreeMutex
-
-//
-// Condition variable functionality
-//
-#define CVAR_CREATE    globalConditionVariableCreate
-#define CVAR_SIGNAL    globalConditionVariableSignal
-#define CVAR_BROADCAST globalConditionVariableBroadcast
-#define CVAR_WAIT      globalConditionVariableWait
-#define CVAR_FREE      globalConditionVariableFree
-
-//
-// Thread functionality
-//
-#define THREAD_CREATE      globalCreateThread
-#define THREAD_CREATE_EX   globalCreateThreadEx
-#define THREAD_JOIN        globalJoinThread
-#define THREAD_SLEEP       globalThreadSleep
-#define THREAD_SLEEP_UNTIL globalThreadSleepUntil
-#define THREAD_CANCEL      globalCancelThread
-#define THREAD_DETACH      globalDetachThread
-#define THREAD_EXIT        globalExitThread
-
-//
-// Static initializers
-//
-#define MUTEX_INIT           GLOBAL_MUTEX_INIT
-#define MUTEX_INIT_RECURSIVE GLOBAL_MUTEX_INIT_RECURSIVE
-#define CVAR_INIT            GLOBAL_CVAR_INIT
-
-//
-// Basic Atomics functionality
-//
-#define ATOMIC_LOAD             globalAtomicLoad
-#define ATOMIC_STORE            globalAtomicStore
-#define ATOMIC_EXCHANGE         globalAtomicExchange
-#define ATOMIC_COMPARE_EXCHANGE globalAtomicCompareExchange
-#define ATOMIC_INCREMENT        globalAtomicIncrement
-#define ATOMIC_DECREMENT        globalAtomicDecrement
-#define ATOMIC_ADD              globalAtomicAdd
-#define ATOMIC_SUBTRACT         globalAtomicSubtract
-#define ATOMIC_AND              globalAtomicAnd
-#define ATOMIC_OR               globalAtomicOr
-#define ATOMIC_XOR              globalAtomicXor
-
-//
-// Helper atomics
-//
-typedef SIZE_T ATOMIC_BOOL;
-#define ATOMIC_LOAD_BOOL             (BOOL) globalAtomicLoad
-#define ATOMIC_STORE_BOOL(a, b)      ATOMIC_STORE((a), (SIZE_T)(b))
-#define ATOMIC_EXCHANGE_BOOL         (BOOL) globalAtomicExchange
-#define ATOMIC_COMPARE_EXCHANGE_BOOL (BOOL) globalAtomicCompareExchange
-#define ATOMIC_AND_BOOL              (BOOL) globalAtomicAnd
-#define ATOMIC_OR_BOOL               (BOOL) globalAtomicOr
-#define ATOMIC_XOR_BOOL              (BOOL) globalAtomicXor
+#ifndef ABS
+#define ABS(a) ((a) > (0) ? (a) : (-a))
+#endif
 
 #ifndef SQRT
 #include <math.h>
@@ -1005,26 +590,6 @@ typedef SIZE_T ATOMIC_BOOL;
 //
 #define ROUND_DOWN(X, A) ((X) & ~((A) -1))
 #define ROUND_UP(X, A)   (((X) + (A) -1) & ~((A) -1))
-
-//
-// Macros to swap endinanness
-//
-#define LOW_BYTE(x)   ((BYTE)(x))
-#define HIGH_BYTE(x)  ((BYTE)(((INT16)(x) >> 8) & 0xFF))
-#define LOW_INT16(x)  ((INT16)(x))
-#define HIGH_INT16(x) ((INT16)(((INT32)(x) >> 16) & 0xFFFF))
-#define LOW_INT32(x)  ((INT32)(x))
-#define HIGH_INT32(x) ((INT32)(((INT64)(x) >> 32) & 0xFFFFFFFF))
-
-#define MAKE_INT16(a, b) ((INT16)(((UINT8)((UINT16)(a) &0xff)) | ((UINT16)((UINT8)((UINT16)(b) &0xff))) << 8))
-#define MAKE_INT32(a, b) ((INT32)(((UINT16)((UINT32)(a) &0xffff)) | ((UINT32)((UINT16)((UINT32)(b) &0xffff))) << 16))
-#define MAKE_INT64(a, b) ((INT64)(((UINT32)((UINT64)(a) &0xffffffff)) | ((UINT64)((UINT32)((UINT64)(b) &0xffffffff))) << 32))
-
-#define SWAP_INT16(x) MAKE_INT16(HIGH_BYTE(x), LOW_BYTE(x))
-
-#define SWAP_INT32(x) MAKE_INT32(SWAP_INT16(HIGH_INT16(x)), SWAP_INT16(LOW_INT16(x)))
-
-#define SWAP_INT64(x) MAKE_INT64(SWAP_INT32(HIGH_INT32(x)), SWAP_INT32(LOW_INT32(x)))
 
 //
 // Check if at most 1 bit is set
@@ -1055,7 +620,10 @@ typedef UINT64 HANDLE;
 #define HANDLE_TO_POINTER(h) ((PBYTE)(h))
 #endif
 
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 #ifdef __cplusplus
 }
 #endif
-#endif /* __COMMON_DEFINITIONS__ */
+#endif /* __AWS_KVS_WEBRTC_COMMON_DEFINITIONS_INCLUDE__ */

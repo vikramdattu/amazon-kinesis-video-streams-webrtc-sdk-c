@@ -41,20 +41,17 @@ extern "C" {
 
 typedef STATUS (*MessageHandlerFunc)(PVOID pUserData, PCHAR pMessage, UINT32 messageLen);
 typedef STATUS (*CtrlMessageHandlerFunc)(PVOID pUserData, UINT8 opcode, PCHAR pMessage, UINT32 messageLen);
-typedef STATUS (*TerminationHandlerFunc)(PVOID pUserData, STATUS errCode);
 
 typedef struct {
     wslay_event_context_ptr event_ctx;            //!< the event context of wslay.
     struct wslay_event_callbacks event_callbacks; //!< the callback of event context.
     NetIoHandle xNetIoHandle;
     UINT64 pingCounter;
-    MUTEX clientLock;                          //!< the lock for the control of the whole wss client api.
-    MUTEX listenerLock;                        //!< the lock for the listener thread.
+    MUTEX ioLock;                              //!< the lock for the control of the wss io.
     PVOID pUserData;                           //!< the arguments of the message handler. ref: PSignalingClient
     MessageHandlerFunc messageHandler;         //!< the handler of receive the non-ctrl messages.
     CtrlMessageHandlerFunc ctrlMessageHandler; //!< the handler of receive the ctrl messages.
-    TerminationHandlerFunc terminationHandler;
-    TID listenerTid;
+    TID clientTid;
 } WssClientContext, *PWssClientContext;
 
 /******************************************************************************
@@ -75,7 +72,7 @@ STATUS wss_client_validateAcceptKey(PCHAR clientKey, UINT32 clientKeyLen, PCHAR 
  * @return STATUS status of execution.
  */
 VOID wss_client_create(PWssClientContext* ppWssClientCtx, NetIoHandle pNetworkContext, PVOID pUserData, MessageHandlerFunc pFunc,
-                       CtrlMessageHandlerFunc pCtrlFunc, TerminationHandlerFunc pTerminationHandlerFunc);
+                       CtrlMessageHandlerFunc pCtrlFunc);
 /**
  * @brief start the wss thread to handle the wss connection.
  *
@@ -83,7 +80,7 @@ VOID wss_client_create(PWssClientContext* ppWssClientCtx, NetIoHandle pNetworkCo
  *
  * @return STATUS status of execution.
  */
-PVOID wss_client_start(PWssClientContext pWssClientCtx);
+STATUS wss_client_start(PWssClientContext pWssClientCtx);
 /**
  * @brief send the text message through the wss connection.
  *

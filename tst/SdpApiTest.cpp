@@ -228,18 +228,18 @@ TEST_F(SdpApiTest, setTransceiverPayloadTypes_NoRtxType)
     transceiver.sender.packetBuffer = NULL;
     transceiver.sender.retransmitter = NULL;
     EXPECT_EQ(STATUS_SUCCESS, hashTableCreate(&pCodecTable));
-    EXPECT_EQ(STATUS_SUCCESS, hashTablePut(pCodecTable, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 1));
+    EXPECT_EQ(STATUS_SUCCESS, hash_table_put(pCodecTable, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 1));
     EXPECT_EQ(STATUS_SUCCESS, hashTableCreate(&pRtxTable));
-    EXPECT_EQ(STATUS_SUCCESS, doubleListCreate(&pTransceivers));
-    EXPECT_EQ(STATUS_SUCCESS, doubleListInsertItemHead(pTransceivers, (UINT64)(&transceiver)));
-    EXPECT_EQ(STATUS_SUCCESS, setTransceiverPayloadTypes(pCodecTable, pRtxTable, pTransceivers));
+    EXPECT_EQ(STATUS_SUCCESS, double_list_create(&pTransceivers));
+    EXPECT_EQ(STATUS_SUCCESS, double_list_insertItemHead(pTransceivers, (UINT64)(&transceiver)));
+    EXPECT_EQ(STATUS_SUCCESS, sdp_setTransceiverPayloadTypes(pCodecTable, pRtxTable, pTransceivers));
     EXPECT_EQ(1, transceiver.sender.payloadType);
     EXPECT_NE((PRtpRollingBuffer) NULL, transceiver.sender.packetBuffer);
     EXPECT_NE((PRetransmitter) NULL, transceiver.sender.retransmitter);
-    hashTableFree(pCodecTable);
-    hashTableFree(pRtxTable);
-    freeRtpRollingBuffer(&transceiver.sender.packetBuffer);
-    freeRetransmitter(&transceiver.sender.retransmitter);
+    hash_table_free(pCodecTable);
+    hash_table_free(pRtxTable);
+    rtp_rolling_buffer_free(&transceiver.sender.packetBuffer);
+    retransmitter_free(&transceiver.sender.retransmitter);
     doubleListFree(pTransceivers);
 }
 
@@ -254,20 +254,20 @@ TEST_F(SdpApiTest, setTransceiverPayloadTypes_HasRtxType)
     transceiver.sender.packetBuffer = NULL;
     transceiver.sender.retransmitter = NULL;
     EXPECT_EQ(STATUS_SUCCESS, hashTableCreate(&pCodecTable));
-    EXPECT_EQ(STATUS_SUCCESS, hashTablePut(pCodecTable, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 1));
+    EXPECT_EQ(STATUS_SUCCESS, hash_table_put(pCodecTable, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 1));
     EXPECT_EQ(STATUS_SUCCESS, hashTableCreate(&pRtxTable));
-    EXPECT_EQ(STATUS_SUCCESS, hashTablePut(pRtxTable, RTC_RTX_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 2));
-    EXPECT_EQ(STATUS_SUCCESS, doubleListCreate(&pTransceivers));
-    EXPECT_EQ(STATUS_SUCCESS, doubleListInsertItemHead(pTransceivers, (UINT64)(&transceiver)));
-    EXPECT_EQ(STATUS_SUCCESS, setTransceiverPayloadTypes(pCodecTable, pRtxTable, pTransceivers));
+    EXPECT_EQ(STATUS_SUCCESS, hash_table_put(pRtxTable, RTC_RTX_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE, 2));
+    EXPECT_EQ(STATUS_SUCCESS, double_list_create(&pTransceivers));
+    EXPECT_EQ(STATUS_SUCCESS, double_list_insertItemHead(pTransceivers, (UINT64)(&transceiver)));
+    EXPECT_EQ(STATUS_SUCCESS, sdp_setTransceiverPayloadTypes(pCodecTable, pRtxTable, pTransceivers));
     EXPECT_EQ(1, transceiver.sender.payloadType);
     EXPECT_EQ(2, transceiver.sender.rtxPayloadType);
     EXPECT_NE((PRtpRollingBuffer) NULL, transceiver.sender.packetBuffer);
     EXPECT_NE((PRetransmitter) NULL, transceiver.sender.retransmitter);
-    hashTableFree(pCodecTable);
-    hashTableFree(pRtxTable);
-    freeRtpRollingBuffer(&transceiver.sender.packetBuffer);
-    freeRetransmitter(&transceiver.sender.retransmitter);
+    hash_table_free(pCodecTable);
+    hash_table_free(pRtxTable);
+    rtp_rolling_buffer_free(&transceiver.sender.packetBuffer);
+    retransmitter_free(&transceiver.sender.retransmitter);
     doubleListFree(pTransceivers);
 }
 
@@ -280,7 +280,7 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendRecv)
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
     // Create peer connection
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
 
     RtcMediaStreamTrack track;
     PRtcRtpTransceiver pTransceiver;
@@ -294,12 +294,12 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendRecv)
     STRCPY(track.streamId, "myKvsVideoStream");
     STRCPY(track.trackId, "myTrack");
 
-    EXPECT_EQ(STATUS_SUCCESS, addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
-    EXPECT_EQ(STATUS_SUCCESS, createOffer(offerPc, &sessionDescriptionInit));
+    EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createOffer(offerPc, &sessionDescriptionInit));
     EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendrecv", sessionDescriptionInit.sdp);
 
-    closePeerConnection(offerPc);
-    freePeerConnection(&offerPc);
+    pc_close(offerPc);
+    pc_free(&offerPc);
 }
 
 TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendRecvMaxTransceivers)
@@ -311,7 +311,7 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendRecvMaxTransceivers)
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
     // Create peer connection
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
 
     RtcMediaStreamTrack track;
     PRtcRtpTransceiver pTransceiver;
@@ -327,18 +327,18 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendRecvMaxTransceivers)
 
     // Max transceivers
     for (UINT32 i = 0; i < MAX_SDP_SESSION_MEDIA_COUNT - 1; i++) {
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
     }
 
-    EXPECT_EQ(STATUS_SUCCESS, createOffer(offerPc, &sessionDescriptionInit));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createOffer(offerPc, &sessionDescriptionInit));
     EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendrecv", sessionDescriptionInit.sdp);
 
     // Adding one more should fail
-    EXPECT_EQ(STATUS_SUCCESS, addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
-    EXPECT_EQ(STATUS_SESSION_DESCRIPTION_MAX_MEDIA_COUNT, createOffer(offerPc, &sessionDescriptionInit));
+    EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
+    EXPECT_EQ(STATUS_SDP_MAX_MEDIA_COUNT, pc_createOffer(offerPc, &sessionDescriptionInit));
 
-    closePeerConnection(offerPc);
-    freePeerConnection(&offerPc);
+    pc_close(offerPc);
+    pc_free(&offerPc);
 }
 
 TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendOnly)
@@ -350,7 +350,7 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendOnly)
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
     // Create peer connection
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
 
     RtcMediaStreamTrack track;
     PRtcRtpTransceiver pTransceiver;
@@ -364,12 +364,12 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxSendOnly)
     STRCPY(track.streamId, "myKvsVideoStream");
     STRCPY(track.trackId, "myTrack");
 
-    EXPECT_EQ(STATUS_SUCCESS, addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
-    EXPECT_EQ(STATUS_SUCCESS, createOffer(offerPc, &sessionDescriptionInit));
+    EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createOffer(offerPc, &sessionDescriptionInit));
     EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendonly", sessionDescriptionInit.sdp);
 
-    closePeerConnection(offerPc);
-    freePeerConnection(&offerPc);
+    pc_close(offerPc);
+    pc_free(&offerPc);
 }
 
 TEST_F(SdpApiTest, populateSingleMediaSection_TestTxRecvOnly)
@@ -381,7 +381,7 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxRecvOnly)
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
     // Create peer connection
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
 
     RtcMediaStreamTrack track;
     PRtcRtpTransceiver pTransceiver;
@@ -395,12 +395,12 @@ TEST_F(SdpApiTest, populateSingleMediaSection_TestTxRecvOnly)
     STRCPY(track.streamId, "myKvsVideoStream");
     STRCPY(track.trackId, "myTrack");
 
-    EXPECT_EQ(STATUS_SUCCESS, addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
-    EXPECT_EQ(STATUS_SUCCESS, createOffer(offerPc, &sessionDescriptionInit));
+    EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(offerPc, &track, &rtcRtpTransceiverInit, &pTransceiver));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createOffer(offerPc, &sessionDescriptionInit));
     EXPECT_PRED_FORMAT2(testing::IsSubstring, "recvonly", sessionDescriptionInit.sdp);
 
-    closePeerConnection(offerPc);
-    freePeerConnection(&offerPc);
+    pc_close(offerPc);
+    pc_free(&offerPc);
 }
 
 TEST_F(SdpApiTest, populateSingleMediaSection_TestPayloadNoFmtp)
@@ -439,26 +439,26 @@ a=rtpmap:102 H264/90000
         MEMSET(&rtcMediaStreamTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
         MEMSET(&rtcSessionDescriptionInit, 0x00, SIZEOF(RtcSessionDescriptionInit));
 
-        EXPECT_EQ(createPeerConnection(&rtcConfiguration, &pRtcPeerConnection), STATUS_SUCCESS);
-        EXPECT_EQ(addSupportedCodec(pRtcPeerConnection, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE), STATUS_SUCCESS);
+        EXPECT_EQ(pc_create(&rtcConfiguration, &pRtcPeerConnection), STATUS_SUCCESS);
+        EXPECT_EQ(pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE), STATUS_SUCCESS);
 
         rtcRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY;
         rtcMediaStreamTrack.kind = MEDIA_STREAM_TRACK_KIND_VIDEO;
         rtcMediaStreamTrack.codec = RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE;
         STRCPY(rtcMediaStreamTrack.streamId, "myKvsVideoStream");
         STRCPY(rtcMediaStreamTrack.trackId, "myTrack");
-        EXPECT_EQ(addTransceiver(pRtcPeerConnection, &rtcMediaStreamTrack, &rtcRtpTransceiverInit, &pRtcRtpTransceiver), STATUS_SUCCESS);
+        EXPECT_EQ(pc_addTransceiver(pRtcPeerConnection, &rtcMediaStreamTrack, &rtcRtpTransceiverInit, &pRtcRtpTransceiver), STATUS_SUCCESS);
 
         STRCPY(rtcSessionDescriptionInit.sdp, (PCHAR) sdp);
         rtcSessionDescriptionInit.type = SDP_TYPE_OFFER;
-        EXPECT_EQ(setRemoteDescription(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
-        EXPECT_EQ(TRUE, canTrickleIceCandidates(pRtcPeerConnection).value);
-        EXPECT_EQ(createAnswer(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
+        EXPECT_EQ(pc_setRemoteDescription(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
+        EXPECT_EQ(TRUE, pc_canTrickleIceCandidates(pRtcPeerConnection).value);
+        EXPECT_EQ(pc_createAnswer(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
         EXPECT_PRED_FORMAT2(testing::IsNotSubstring, "fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
                             rtcSessionDescriptionInit.sdp);
 
-        closePeerConnection(pRtcPeerConnection);
-        freePeerConnection(&pRtcPeerConnection);
+        pc_close(pRtcPeerConnection);
+        pc_free(&pRtcPeerConnection);
     });
 }
 
@@ -576,19 +576,19 @@ a=group:BUNDLE 0
         offerSdp.type = SDP_TYPE_OFFER;
         STRNCPY(offerSdp.sdp, (PCHAR) sdp, MAX_SESSION_DESCRIPTION_INIT_SDP_LEN);
 
-        EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&configuration, &pRtcPeerConnection));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
+        EXPECT_EQ(STATUS_SUCCESS, pc_create(&configuration, &pRtcPeerConnection));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
 
-        EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(pRtcPeerConnection, &offerSdp));
-        EXPECT_EQ(STATUS_SUCCESS, createAnswer(pRtcPeerConnection, &answerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(pRtcPeerConnection, &offerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_createAnswer(pRtcPeerConnection, &answerSdp));
 
         EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendonly", answerSdp.sdp);
         EXPECT_PRED_FORMAT2(testing::IsNotSubstring, "sendrecv", answerSdp.sdp);
         EXPECT_PRED_FORMAT2(testing::IsNotSubstring, "recvonly", answerSdp.sdp);
 
-        closePeerConnection(pRtcPeerConnection);
-        EXPECT_EQ(STATUS_SUCCESS, freePeerConnection(&pRtcPeerConnection));
+        pc_close(pRtcPeerConnection);
+        EXPECT_EQ(STATUS_SUCCESS, pc_free(&pRtcPeerConnection));
     });
 }
 
@@ -636,21 +636,21 @@ a=group:BUNDLE 0
         offerSdp.type = SDP_TYPE_OFFER;
         STRNCPY(offerSdp.sdp, (PCHAR) sdp, MAX_SESSION_DESCRIPTION_INIT_SDP_LEN);
 
-        EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&configuration, &pRtcPeerConnection));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_OPUS));
+        EXPECT_EQ(STATUS_SUCCESS, pc_create(&configuration, &pRtcPeerConnection));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_OPUS));
 
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
 
-        EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(pRtcPeerConnection, &offerSdp));
-        EXPECT_EQ(STATUS_SUCCESS, createAnswer(pRtcPeerConnection, &answerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(pRtcPeerConnection, &offerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_createAnswer(pRtcPeerConnection, &answerSdp));
 
         EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendonly", answerSdp.sdp);
         EXPECT_PRED_FORMAT2(testing::IsSubstring, "sendrecv", answerSdp.sdp);
 
-        closePeerConnection(pRtcPeerConnection);
-        EXPECT_EQ(STATUS_SUCCESS, freePeerConnection(&pRtcPeerConnection));
+        pc_close(pRtcPeerConnection);
+        EXPECT_EQ(STATUS_SUCCESS, pc_free(&pRtcPeerConnection));
     });
 }
 
@@ -697,21 +697,21 @@ a=group:BUNDLE 0
         offerSdp.type = SDP_TYPE_OFFER;
         STRNCPY(offerSdp.sdp, (PCHAR) sdp, MAX_SESSION_DESCRIPTION_INIT_SDP_LEN);
 
-        EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&configuration, &pRtcPeerConnection));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_OPUS));
+        EXPECT_EQ(STATUS_SUCCESS, pc_create(&configuration, &pRtcPeerConnection));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_OPUS));
 
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
 
-        EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(pRtcPeerConnection, &offerSdp));
-        EXPECT_EQ(STATUS_SUCCESS, createAnswer(pRtcPeerConnection, &answerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(pRtcPeerConnection, &offerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_createAnswer(pRtcPeerConnection, &answerSdp));
 
         EXPECT_PRED_FORMAT2(testing::IsSubstring, "video", answerSdp.sdp);
         EXPECT_PRED_FORMAT2(testing::IsNotSubstring, "audio", answerSdp.sdp);
 
-        closePeerConnection(pRtcPeerConnection);
-        EXPECT_EQ(STATUS_SUCCESS, freePeerConnection(&pRtcPeerConnection));
+        pc_close(pRtcPeerConnection);
+        EXPECT_EQ(STATUS_SUCCESS, pc_free(&pRtcPeerConnection));
     });
 }
 
@@ -760,14 +760,14 @@ a=ice-options:trickle
         offerSdp.type = SDP_TYPE_OFFER;
         STRNCPY(offerSdp.sdp, (PCHAR) sdp, MAX_SESSION_DESCRIPTION_INIT_SDP_LEN);
 
-        EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&configuration, &pRtcPeerConnection));
-        EXPECT_EQ(STATUS_SUCCESS, addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
-        EXPECT_EQ(STATUS_SUCCESS, addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
+        EXPECT_EQ(STATUS_SUCCESS, pc_create(&configuration, &pRtcPeerConnection));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_VP8));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track1, nullptr, &transceiver1));
+        EXPECT_EQ(STATUS_SUCCESS, pc_addTransceiver(pRtcPeerConnection, &track2, nullptr, &transceiver2));
 
-        EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(pRtcPeerConnection, &offerSdp));
-        EXPECT_EQ(TRUE, canTrickleIceCandidates(pRtcPeerConnection).value);
-        EXPECT_EQ(STATUS_SUCCESS, createAnswer(pRtcPeerConnection, &answerSdp));
+        EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(pRtcPeerConnection, &offerSdp));
+        EXPECT_EQ(TRUE, pc_canTrickleIceCandidates(pRtcPeerConnection).value);
+        EXPECT_EQ(STATUS_SUCCESS, pc_createAnswer(pRtcPeerConnection, &answerSdp));
 
         std::string answer = answerSdp.sdp;
         std::set<std::string> ssrcLines;
@@ -784,8 +784,8 @@ a=ice-options:trickle
 
         ASSERT_EQ(2, ssrcLines.size());
 
-        closePeerConnection(pRtcPeerConnection);
-        EXPECT_EQ(STATUS_SUCCESS, freePeerConnection(&pRtcPeerConnection));
+        pc_close(pRtcPeerConnection);
+        EXPECT_EQ(STATUS_SUCCESS, pc_free(&pRtcPeerConnection));
     });
 }
 
@@ -826,25 +826,25 @@ a=fmtp:102 strange
         MEMSET(&rtcMediaStreamTrack, 0x00, SIZEOF(RtcMediaStreamTrack));
         MEMSET(&rtcSessionDescriptionInit, 0x00, SIZEOF(RtcSessionDescriptionInit));
 
-        EXPECT_EQ(createPeerConnection(&rtcConfiguration, &pRtcPeerConnection), STATUS_SUCCESS);
-        EXPECT_EQ(addSupportedCodec(pRtcPeerConnection, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE), STATUS_SUCCESS);
+        EXPECT_EQ(pc_create(&rtcConfiguration, &pRtcPeerConnection), STATUS_SUCCESS);
+        EXPECT_EQ(pc_addSupportedCodec(pRtcPeerConnection, RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE), STATUS_SUCCESS);
 
         rtcRtpTransceiverInit.direction = RTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY;
         rtcMediaStreamTrack.kind = MEDIA_STREAM_TRACK_KIND_VIDEO;
         rtcMediaStreamTrack.codec = RTC_CODEC_H264_PROFILE_42E01F_LEVEL_ASYMMETRY_ALLOWED_PACKETIZATION_MODE;
         STRCPY(rtcMediaStreamTrack.streamId, "myKvsVideoStream");
         STRCPY(rtcMediaStreamTrack.trackId, "myTrack");
-        EXPECT_EQ(addTransceiver(pRtcPeerConnection, &rtcMediaStreamTrack, &rtcRtpTransceiverInit, &pRtcRtpTransceiver), STATUS_SUCCESS);
+        EXPECT_EQ(pc_addTransceiver(pRtcPeerConnection, &rtcMediaStreamTrack, &rtcRtpTransceiverInit, &pRtcRtpTransceiver), STATUS_SUCCESS);
 
         STRCPY(rtcSessionDescriptionInit.sdp, (PCHAR) sdp);
         rtcSessionDescriptionInit.type = SDP_TYPE_OFFER;
-        EXPECT_EQ(setRemoteDescription(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
-        EXPECT_EQ(createAnswer(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
+        EXPECT_EQ(pc_setRemoteDescription(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
+        EXPECT_EQ(pc_createAnswer(pRtcPeerConnection, &rtcSessionDescriptionInit), STATUS_SUCCESS);
         EXPECT_PRED_FORMAT2(testing::IsSubstring, "fmtp:102 strange", rtcSessionDescriptionInit.sdp);
         EXPECT_PRED_FORMAT2(testing::IsNotSubstring, "fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
                             rtcSessionDescriptionInit.sdp);
-        closePeerConnection(pRtcPeerConnection);
-        freePeerConnection(&pRtcPeerConnection);
+        pc_close(pRtcPeerConnection);
+        pc_free(&pRtcPeerConnection);
     });
 }
 

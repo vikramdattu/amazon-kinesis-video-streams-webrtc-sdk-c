@@ -1,12 +1,35 @@
+/*
+ * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 #define LOG_CLASS "RtcpPacket"
+#include <arpa/inet.h>
 
-#include "../Include_i.h"
 #include "endianness.h"
 #include "RtpPacket.h"
 #include "RtcpPacket.h"
-#include <arpa/inet.h>
+#include "time_port.h"
 
-STATUS setRtcpPacketFromBytes(PBYTE pRawPacket, UINT32 pRawPacketsLen, PRtcpPacket pRtcpPacket)
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
+STATUS rtcp_packet_setFromBytes(PBYTE pRawPacket, UINT32 pRawPacketsLen, PRtcpPacket pRtcpPacket)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -38,8 +61,8 @@ CleanUp:
 
 // Given a RTCP Packet list extract the list of SSRCes, since the list of SSRCes may not be know ahead of time (because of BLP)
 // we need to allocate the list dynamically
-STATUS rtcpNackListGet(PBYTE pPayload, UINT32 payloadLen, PUINT32 pSenderSsrc, PUINT32 pReceiverSsrc, PUINT16 pSequenceNumberList,
-                       PUINT32 pSequenceNumberListLen)
+STATUS rtcp_packet_getNackList(PBYTE pPayload, UINT32 payloadLen, PUINT32 pSenderSsrc, PUINT32 pReceiverSsrc, PUINT16 pSequenceNumberList,
+                               PUINT32 pSequenceNumberListLen)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -84,7 +107,7 @@ CleanUp:
 }
 
 // Assert that Application Layer Feedback payload is REMB
-STATUS isRembPacket(PBYTE pPayload, UINT32 payloadLen)
+STATUS rtcp_packet_isRemb(PBYTE pPayload, UINT32 payloadLen)
 {
     STATUS retStatus = STATUS_SUCCESS;
     const BYTE rembUniqueIdentifier[] = {0x52, 0x45, 0x4d, 0x42};
@@ -110,7 +133,7 @@ CleanUp:
  *     pSsrcList        - buffer to write list of SSRCes into.
  *     pSsrcListLen     - destination PUINT32 to store the count of SSRCes from the incoming REMB.
  */
-STATUS rembValueGet(PBYTE pPayload, UINT32 payloadLen, PDOUBLE pMaximumBitRate, PUINT32 pSsrcList, PUINT8 pSsrcListLen)
+STATUS rtcp_packet_getRembValue(PBYTE pPayload, UINT32 payloadLen, PDOUBLE pMaximumBitRate, PUINT32 pSsrcList, PUINT8 pSsrcListLen)
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
@@ -147,7 +170,7 @@ CleanUp:
 }
 
 // converts 100ns precision time to ntp time
-UINT64 convertTimestampToNTP(UINT64 time100ns)
+UINT64 rtcp_packet_convertTimestampToNTP(UINT64 time100ns)
 {
     UINT64 sec = time100ns / HUNDREDS_OF_NANOS_IN_A_SECOND;
     UINT64 _100ns = time100ns % HUNDREDS_OF_NANOS_IN_A_SECOND;

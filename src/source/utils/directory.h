@@ -18,11 +18,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
 #include "kvs/common_defs.h"
-/////////////////////////////////////////
-// Directory functionality
-/////////////////////////////////////////
+
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 typedef enum { DIR_ENTRY_TYPE_FILE, DIR_ENTRY_TYPE_LINK, DIR_ENTRY_TYPE_DIRECTORY, DIR_ENTRY_TYPE_UNKNOWN } DIR_ENTRY_TYPES;
+
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 /**
  * Callback function declaration.
  *
@@ -40,7 +48,7 @@ typedef STATUS (*DirectoryEntryCallbackFunc)(UINT64, DIR_ENTRY_TYPES, PCHAR, PCH
  * @BOOL - whether to iterate
  * @DirectoryEntryCallbackFunc - the callback function called with each entry
  */
-STATUS traverseDirectory(PCHAR, UINT64, BOOL iterate, DirectoryEntryCallbackFunc);
+STATUS directory_traverse(PCHAR, UINT64, BOOL iterate, DirectoryEntryCallbackFunc);
 
 #ifdef __cplusplus
 }

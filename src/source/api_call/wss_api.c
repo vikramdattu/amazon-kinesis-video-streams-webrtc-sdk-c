@@ -27,8 +27,8 @@
 /******************************************************************************
  * DEFINITION
  ******************************************************************************/
-#define WSS_API_ENTER() DLOGD("%s enter", __func__);
-#define WSS_API_EXIT()  DLOGD("%s exit", __func__);
+#define WSS_API_ENTER() // DLOGD("%s enter", __func__);
+#define WSS_API_EXIT()  // DLOGD("%s exit", __func__);
 
 #define WSS_API_SECURE_PORT                "443"
 #define WSS_API_CONNECTION_TIMEOUT         (2 * HUNDREDS_OF_NANOS_IN_A_SECOND)
@@ -69,8 +69,14 @@ STATUS wss_api_connect(PSignalingClient pSignalingClient, PUINT32 pHttpStatusCod
     uint8_t* pHttpSendBuffer = NULL;
     uint8_t* pHttpRecvBuffer = NULL;
 
-    CHK(pSignalingClient != NULL, STATUS_WSS_API_NULL_ARG);
+    BOOL locked = FALSE;
+
+    CHK(pSignalingClient != NULL, STATUS_WSS_API_MISSING_SIGNALING_CLIENT);
     CHK(pSignalingClient->channelDescription.channelEndpointWss[0] != '\0', STATUS_INTERNAL_ERROR);
+
+    MUTEX_LOCK(pSignalingClient->wssContextLock);
+    locked = TRUE;
+
     CHK(NULL != (pHost = (CHAR*) MEMALLOC(MAX_CONTROL_PLANE_URI_CHAR_LEN)), STATUS_WSS_API_NOT_ENOUGH_MEMORY);
     CHK(NULL != (pHttpSendBuffer = (uint8_t*) MEMCALLOC(WSS_API_SEND_BUFFER_MAX_SIZE, 1)), STATUS_HTTP_NOT_ENOUGH_MEMORY);
     CHK(NULL != (pHttpRecvBuffer = (uint8_t*) MEMCALLOC(WSS_API_RECV_BUFFER_MAX_SIZE, 1)), STATUS_HTTP_NOT_ENOUGH_MEMORY);
@@ -100,10 +106,10 @@ STATUS wss_api_connect(PSignalingClient pSignalingClient, PUINT32 pHttpStatusCod
     CHK(NULL != (xNetIoHandle = NetIo_create()), STATUS_HTTP_NOT_ENOUGH_MEMORY);
     CHK_STATUS(NetIo_setRecvTimeout(xNetIoHandle, WSS_API_COMPLETION_TIMEOUT));
     CHK_STATUS(NetIo_setSendTimeout(xNetIoHandle, WSS_API_COMPLETION_TIMEOUT));
-    CHK_STATUS(createRequestInfo(pUrl, NULL, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent, WSS_API_CONNECTION_TIMEOUT,
-                                 WSS_API_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials,
-                                 &pRequestInfo));
+    CHK_STATUS(request_info_create(pUrl, NULL, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+                                   SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent, WSS_API_CONNECTION_TIMEOUT,
+                                   WSS_API_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+                                   pSignalingClient->pAwsCredentials, &pRequestInfo));
     pRequestInfo->verb = HTTP_REQUEST_VERB_GET;
     MEMSET(clientKey, 0, WSS_CLIENT_BASED64_RANDOM_SEED_LEN + 1);
     CHK_STATUS(wss_client_generateClientKey(clientKey, WSS_CLIENT_BASED64_RANDOM_SEED_LEN + 1));
@@ -113,10 +119,10 @@ STATUS wss_api_connect(PSignalingClient pSignalingClient, PUINT32 pHttpStatusCod
 
     CHK_STATUS(NetIo_connect(xNetIoHandle, pHost, WSS_API_SECURE_PORT));
 
-    CHK(NetIo_send(xNetIoHandle, (unsigned char*) pHttpSendBuffer, STRLEN((PCHAR) pHttpSendBuffer)) == STATUS_SUCCESS, STATUS_SEND_DATA_FAILED);
+    CHK(NetIo_send(xNetIoHandle, (unsigned char*) pHttpSendBuffer, STRLEN((PCHAR) pHttpSendBuffer)) == STATUS_SUCCESS, STATUS_NET_SEND_DATA_FAILED);
     CHK_STATUS(NetIo_recv(xNetIoHandle, (unsigned char*) pHttpRecvBuffer, WSS_API_RECV_BUFFER_MAX_SIZE, &uBytesReceived));
 
-    CHK(uBytesReceived > 0, STATUS_RECV_DATA_FAILED);
+    CHK(uBytesReceived > 0, STATUS_NET_RECV_DATA_FAILED);
 
     struct list_head* requiredHeader = MEMALLOC(sizeof(struct list_head));
     INIT_LIST_HEAD(requiredHeader);
@@ -150,11 +156,9 @@ STATUS wss_api_connect(PSignalingClient pSignalingClient, PUINT32 pHttpStatusCod
         PWssClientContext pWssClientCtx = NULL;
         uHttpStatusCode = HTTP_STATUS_UNKNOWN;
 
-        wss_client_create(&pWssClientCtx, xNetIoHandle, pSignalingClient, wss_api_handleDataMsg, wss_api_handleCtrlMsg, wss_api_handleDisconnection);
+        wss_client_create(&pWssClientCtx, xNetIoHandle, pSignalingClient, wss_api_handleDataMsg, wss_api_handleCtrlMsg);
         pSignalingClient->pWssContext = pWssClientCtx;
-        CHK_STATUS(THREAD_CREATE_EX(&pWssClientCtx->listenerTid, WSS_LISTENER_THREAD_NAME, WSS_LISTENER_THREAD_SIZE, wss_client_start,
-                                    (PVOID) pWssClientCtx));
-        CHK_STATUS(THREAD_DETACH(pWssClientCtx->listenerTid));
+        CHK_STATUS(wss_client_start(pWssClientCtx));
 
         uHttpStatusCode = HTTP_STATUS_OK;
     }
@@ -190,11 +194,15 @@ CleanUp:
         *pHttpStatusCode = uHttpStatusCode;
     }
 
+    if (locked == TRUE) {
+        MUTEX_UNLOCK(pSignalingClient->wssContextLock);
+    }
+
     SAFE_MEMFREE(pHost);
     SAFE_MEMFREE(pUrl);
     SAFE_MEMFREE(pHttpSendBuffer);
     SAFE_MEMFREE(pHttpRecvBuffer);
-    freeRequestInfo(pRequestInfo);
+    request_info_free(pRequestInfo);
 
     WSS_API_EXIT();
     return retStatus;
@@ -204,7 +212,8 @@ STATUS wss_api_send(PSignalingClient pSignalingClient, PBYTE pSendBuf, UINT32 bu
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
-    CHK(pSignalingClient != NULL && pSignalingClient->pWssContext != NULL, STATUS_WSS_API_NULL_ARG);
+    CHK(pSignalingClient != NULL, STATUS_WSS_API_MISSING_SIGNALING_CLIENT);
+    CHK(pSignalingClient->pWssContext != NULL, STATUS_WSS_API_MISSING_CONTEXT);
 
     DLOGD("Sending data over web socket: %s", pSendBuf);
     CHK_STATUS(wss_client_sendText(pSignalingClient->pWssContext, pSendBuf, bufLen));
@@ -221,7 +230,7 @@ STATUS wss_api_handleDataMsg(PVOID pUSerData, PCHAR pMessage, UINT32 messageLen)
     PSignalingMessageWrapper pSignalingMessageWrapper = NULL;
     PSignalingClient pSignalingClient = (PSignalingClient) pUSerData;
 
-    CHK(pSignalingClient != NULL, STATUS_WSS_API_NULL_ARG);
+    CHK(pSignalingClient != NULL, STATUS_WSS_API_MISSING_SIGNALING_CLIENT);
 
     // If we have a signalingMessage and if there is a correlation id specified then the response should be non-empty
     if (pMessage == NULL || messageLen == 0) {
@@ -266,23 +275,27 @@ STATUS wss_api_handleCtrlMsg(PVOID pUserData, UINT8 opcode, PCHAR pMessage, UINT
     PCHAR pCurPtr;
     PSignalingClient pSignalingClient = (PSignalingClient) pUserData;
 
-    CHK(pSignalingClient != NULL, STATUS_WSS_API_NULL_ARG);
+    CHK(pSignalingClient != NULL, STATUS_WSS_API_MISSING_SIGNALING_CLIENT);
 
-    DLOGD("opcode:%x", opcode);
+    // DLOGD("opcode:%x", opcode);
     if (opcode == WSLAY_PONG) {
-        DLOGD("<== pong, len: %ld", messageLen);
+        DLOGD("<== wss pong");
     } else if (opcode == WSLAY_PING) {
-        DLOGD("<== ping, len: %ld", messageLen);
+        DLOGV("<== wss ping, len: %ld", messageLen);
     } else if (opcode == WSLAY_CONNECTION_CLOSE) {
-        DLOGD("<== connection close, len: %ld, reason:%s", messageLen, pMessage);
-        pCurPtr = pMessage == NULL ? "(None)" : (PCHAR) pMessage;
-        DLOGW("Client connection failed. Connection error string: %s", pCurPtr);
+        DLOGD("<== connection close, msg len: %ld", messageLen);
 
         PSignalingMessageWrapper pSignalingMessageWrapper = NULL;
+        PSignalingMessage pSignalingMessage = NULL;
 
         CHK(NULL != (pSignalingMessageWrapper = (PSignalingMessageWrapper) MEMCALLOC(1, SIZEOF(SignalingMessageWrapper))),
             STATUS_WSS_API_NOT_ENOUGH_MEMORY);
-        pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage.messageType = SIGNALING_MESSAGE_TYPE_CTRL_CLOSE;
+        pSignalingMessage = &pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage;
+        pSignalingMessage->messageType = SIGNALING_MESSAGE_TYPE_CTRL_CLOSE;
+        if (pMessage != NULL) {
+            STRNCPY(pSignalingMessage->payload, pMessage, MIN(messageLen, MAX_SIGNALING_MESSAGE_LEN) + 1);
+            DLOGW("Client connection failed. reason: %s", pSignalingMessage->payload);
+        }
         pSignalingMessageWrapper->pSignalingClient = pSignalingClient;
 
         // CHK_STATUS(signaling_dispatchMsg((PVOID) pSignalingMessageWrapper));
@@ -302,56 +315,26 @@ CleanUp:
     return retStatus;
 }
 
-STATUS wss_api_handleDisconnection(PVOID pUserData, STATUS errCode)
-{
-    WSS_API_ENTER();
-    STATUS retStatus = STATUS_SUCCESS;
-    BOOL connected;
-    PCHAR pCurPtr;
-    PSignalingClient pSignalingClient = (PSignalingClient) pUserData;
-
-    CHK(pSignalingClient != NULL, STATUS_WSS_API_NULL_ARG);
-
-    PSignalingMessageWrapper pSignalingMessageWrapper = NULL;
-
-    CHK(NULL != (pSignalingMessageWrapper = (PSignalingMessageWrapper) MEMCALLOC(1, SIZEOF(SignalingMessageWrapper))),
-        STATUS_WSS_API_NOT_ENOUGH_MEMORY);
-    pSignalingMessageWrapper->receivedSignalingMessage.signalingMessage.messageType = SIGNALING_MESSAGE_TYPE_CTRL_LISTENER_TREMINATED;
-    pSignalingMessageWrapper->pSignalingClient = pSignalingClient;
-
-    if (pSignalingClient->pDispatchMsgHandler != NULL) {
-        CHK_STATUS(pSignalingClient->pDispatchMsgHandler((PVOID) pSignalingMessageWrapper));
-    } else {
-        SAFE_MEMFREE(pSignalingMessageWrapper);
-    }
-
-CleanUp:
-    WSS_API_EXIT();
-    return retStatus;
-}
-
 STATUS wss_api_disconnect(PSignalingClient pSignalingClient)
 {
     WSS_API_ENTER();
     STATUS retStatus = STATUS_SUCCESS;
+    PWssClientContext pWssClientCtx = NULL;
+    BOOL locked = FALSE;
 
-    CHK(pSignalingClient != NULL, STATUS_WSS_API_NULL_ARG);
-    PWssClientContext pWssClientCtx = (PWssClientContext) pSignalingClient->pWssContext;
-    CHK(pWssClientCtx != NULL, STATUS_WSS_API_NULL_ARG);
+    CHK(pSignalingClient != NULL, STATUS_WSS_API_MISSING_SIGNALING_CLIENT);
+    MUTEX_LOCK(pSignalingClient->wssContextLock);
+    locked = TRUE;
 
-    if (IS_VALID_TID_VALUE(pWssClientCtx->listenerTid)) {
-        THREAD_CANCEL(pWssClientCtx->listenerTid);
-        pWssClientCtx->listenerTid = INVALID_TID_VALUE;
-    }
-
-    // waiting the termination of listener thread.
-    if (pWssClientCtx != NULL) {
-        wss_client_close(pWssClientCtx);
-        pSignalingClient->pWssContext = NULL;
-    }
+    pWssClientCtx = (PWssClientContext) pSignalingClient->pWssContext;
+    CHK(pWssClientCtx != NULL, retStatus);
+    wss_client_close(pWssClientCtx);
+    pSignalingClient->pWssContext = NULL;
 
 CleanUp:
-
+    if (locked == TRUE) {
+        MUTEX_UNLOCK(pSignalingClient->wssContextLock);
+    }
     WSS_API_EXIT();
     return retStatus;
 }

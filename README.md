@@ -192,10 +192,10 @@ Choose Start viewer to start live video streaming of the sample H264/Opus frames
 
 Note: "kinesisvideo:CreateSignalingChannel" can be removed if you are running with existing KVS signaling channels. Viewer sample requires "kinesisvideo:ConnectAsViewer" permission. Integration test requires both "kinesisvideo:ConnectAsViewer" and "kinesisvideo:DeleteSignalingChannel" permission.
 
-* With the IoT certificate, IoT credentials provider endpoint (Note: it is not the endpoint on IoT AWS Console!), public key and private key ready, you can replace the static credentials provider createStaticCredentialProvider() and freeStaticCredentialProvider() with IoT credentials provider like below, the credentials provider for [samples](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/blob/master/samples/Common.c) is in createSampleConfiguration():
+* With the IoT certificate, IoT credentials provider endpoint (Note: it is not the endpoint on IoT AWS Console!), public key and private key ready, you can replace the static credentials provider static_credential_provider_create() and static_credential_provider_free() with IoT credentials provider like below, the credentials provider for [samples](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/blob/master/samples/Common.c) is in createSampleConfiguration():
 
 ```
-createIotCredentialProvider(
+iot_credential_provider_create(
             "coxxxxxxxx168.credentials.iot.us-west-2.amazonaws.com",  // IoT credentials endpoint
             "/Users/username/Downloads/iot-signaling/certificate.pem",  // path to iot certificate
             "/Users/username/Downloads/iot-signaling/private.pem.key", // path to iot private key
@@ -204,24 +204,24 @@ createIotCredentialProvider(
             channelName, // iot thing name, recommended to be same as your channel name
             &pSampleConfiguration->pCredentialProvider));
 
-freeIotCredentialProvider(&pSampleConfiguration->pCredentialProvider);
+iot_credential_provider_free(&pSampleConfiguration->pCredentialProvider);
 ```
 
 ## Use Pre-generated Certificates
-The certificate generating function (createCertificateAndKey) in createDtlsSession() can take between 5 - 15 seconds in low performance embedded devices, it is called for every peer connection creation when KVS WebRTC receives an offer. To avoid this extra start-up latency, certificate can be pre-generated and passed in when offer comes.
+The certificate generating function (certificate_key_create) in dtls_session_create() can take between 5 - 15 seconds in low performance embedded devices, it is called for every peer connection creation when KVS WebRTC receives an offer. To avoid this extra start-up latency, certificate can be pre-generated and passed in when offer comes.
 
 **Important Note: It is recommended to rotate the certificates often - preferably for every peer connection to avoid a compromised client weakening the security of the new connections.**
 
 Take kvsWebRTCClientMaster as sample, add RtcCertificate certificates[CERT_COUNT]; to **SampleConfiguration** in Samples.h.
-Then pass in the pre-generated certificate in initializePeerConnection() in Common.c.
+Then pass in the pre-generated certificate in app_common_initializePeerConnection() in Common.c.
 
 ```
 configuration.certificates[0].pCertificate = pSampleConfiguration->certificates[0].pCertificate;
 configuration.certificates[0].pPrivateKey = pSampleConfiguration->certificates[0].pPrivateKey;
 
-where, `configuration` is of type `RtcConfiguration` in the function that calls `initializePeerConnection()`.
+where, `configuration` is of type `RtcConfiguration` in the function that calls `app_common_initializePeerConnection()`.
 
-Doing this will make sure that `createCertificateAndKey() would not execute since a certificate is already available.`
+Doing this will make sure that `certificate_key_create() would not execute since a certificate is already available.`
 ```
 
 ## DEBUG

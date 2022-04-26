@@ -30,10 +30,10 @@ extern "C" {
 #endif
 #include "kvs/error.h"
 #include "kvs/common_defs.h"
-#include "kvs/Client.h"
 #include "kvs/common.h"
-#include "kvs/NullableDefs.h"
-#include "kvs/Stats.h"
+#include "kvs/nullable_defs.h"
+#include "kvs/platform_utils.h"
+#include "kvs/stats.h"
 #include "tags.h"
 
 #if defined(__clang__)
@@ -416,6 +416,85 @@ typedef enum {
 } RTC_RTP_TRANSCEIVER_DIRECTION;
 
 /**
+ * @brief Service call result
+ *  https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+ */
+typedef enum {
+    // Not defined
+    HTTP_STATUS_NONE = 0,
+    // Information responses
+    //
+    HTTP_STATUS_CONTINUE = 100,
+
+    HTTP_STATUS_SWITCH_PROTOCOL = 101,
+
+    // Successful responses
+    // All OK
+    HTTP_STATUS_OK = 200,
+
+    // Client error responses
+    // Bad request
+    HTTP_STATUS_BAD_REQUEST = 400,
+    // Security error
+    HTTP_STATUS_UNAUTHORIZED = 401,
+    // Forbidden
+    HTTP_STATUS_FORBIDDEN = 403,
+    // Resource not found exception
+    HTTP_STATUS_NOT_FOUND = 404,
+    // Invalid params error
+    HTTP_STATUS_NOT_ACCEPTABLE = 406,
+    // Request timeout
+    HTTP_STATUS_REQUEST_TIMEOUT = 408,
+    // Internal server error
+    HTTP_STATUS_INTERNAL_SERVER_ERROR = 500,
+
+    // Server error responses
+    // Not implemented
+    HTTP_STATUS_NOT_IMPLEMENTED = 501,
+
+    // Service unavailable
+    HTTP_STATUS_SERVICE_UNAVAILABLE = 503,
+
+    // Gateway timeout
+    HTTP_STATUS_GATEWAY_TIMEOUT = 504,
+
+    // Network read timeout
+    HTTP_STATUS_NETWORK_READ_TIMEOUT = 598,
+
+    // Network connection timeout
+    HTTP_STATUS_NETWORK_CONNECTION_TIMEOUT = 599,
+
+    // Go Away result
+    HTTP_STATUS_SIGNALING_GO_AWAY = 6000,
+
+    // Reconnect ICE Server
+    HTTP_STATUS_SIGNALING_RECONNECT_ICE = 6001,
+
+    // Client limit exceeded error
+    HTTP_STATUS_CLIENT_LIMIT = 10000,
+
+    // Device limit exceeded error
+    HTTP_STATUS_DEVICE_LIMIT = 10001,
+
+    // Stream limit exception
+    HTTP_STATUS_STREAM_LIMIT = 10002,
+
+    // Resource in use exception
+    HTTP_STATUS_RESOURCE_IN_USE = 10003,
+
+    // Device not provisioned
+    HTTP_STATUS_DEVICE_NOT_PROVISIONED = 10004,
+
+    // Device not found
+    HTTP_STATUS_DEVICE_NOT_FOUND = 10005,
+    // Other errors
+    HTTP_STATUS_UNKNOWN = 10006,
+    // Resource deleted exception
+    HTTP_STATUS_RESOURCE_DELETED = 10400,
+
+} HTTP_STATUS_CODE;
+
+/**
  * @brief Defines channel status as reported by the service
  */
 typedef enum {
@@ -441,7 +520,6 @@ typedef enum {
     SIGNALING_MESSAGE_TYPE_STATUS_RESPONSE, //!< This message notifies the awaiting send after checking for failure in message delivery
     SIGNALING_MESSAGE_TYPE_CTRL_BASE,
     SIGNALING_MESSAGE_TYPE_CTRL_CLOSE,
-    SIGNALING_MESSAGE_TYPE_CTRL_LISTENER_TREMINATED,
     SIGNALING_MESSAGE_TYPE_UNKNOWN, //!< This message type is set when the type of message received is unknown
 } SIGNALING_MESSAGE_TYPE;
 
@@ -465,19 +543,22 @@ typedef enum {
                                             //!< we get to this state after ICE refresh
     SIGNALING_CLIENT_STATE_CONNECTED,       //!< On transitioning to this state, the timeout on the state machine is reset
     SIGNALING_CLIENT_STATE_DISCONNECTED,    //!< This state transition happens either from connect or connected state
-    SIGNALING_CLIENT_STATE_DELETE,          //!< This state transition happens when the application calls signalingClientDelete API.
-    SIGNALING_CLIENT_STATE_DELETED,   //!< This state transition happens after the channel gets deleted as a result of a signalingClientDelete API.
+    SIGNALING_CLIENT_STATE_DELETE,          //!< This state transition happens when the application calls signaling_client_delete API.
+    SIGNALING_CLIENT_STATE_DELETED,   //!< This state transition happens after the channel gets deleted as a result of a signaling_client_delete API.
                                       //!< This is a terminal state.
     SIGNALING_CLIENT_STATE_MAX_VALUE, //!< This state indicates maximum number of signaling client states
 } SIGNALING_CLIENT_STATE,
     *PSIGNALING_CLIENT_STATE;
 
 /**
- * @brief Channel type as reported by the service
+ * @brief Channel type as reported by the service. A type of the signaling channel that you are creating. Currently, SINGLE_MASTER is the only
+ * supported channel type.
+ *
  */
 typedef enum {
     SIGNALING_CHANNEL_TYPE_UNKNOWN,       //!< Channel type is unknown
     SIGNALING_CHANNEL_TYPE_SINGLE_MASTER, //!< Channel type is master
+    SIGNALING_CHANNEL_TYPE_FULL_MESH,     //!< Channel type is full mesh.
 } SIGNALING_CHANNEL_TYPE;
 
 /**
@@ -566,7 +647,7 @@ typedef VOID (*RtcOnPictureLoss)(UINT64);
 typedef struct __RtcDataChannel {
     CHAR name[MAX_DATA_CHANNEL_NAME_LEN + 1]; //!< Define name of data channel. Max length is 256 characters
     UINT32 id;                                //!< Read only field. Setting this in the application has no effect. This field is populated with the id
-               //!< set by the peer connection's createDataChannel() call or the channel id is set in createDataChannel()
+               //!< set by the peer connection's data_channel_create() call or the channel id is set in data_channel_create()
                //!< on embedded end.
 } RtcDataChannel, *PRtcDataChannel;
 
@@ -832,6 +913,7 @@ typedef struct {
 typedef struct {
     UINT32 version;                                 //!< Version of the structure
     CHAR clientId[MAX_SIGNALING_CLIENT_ID_LEN + 1]; //!< Client id to use. Defines if the client is a producer/consumers
+    // #http_api_getIceConfig
 } SignalingClientInfo, *PSignalingClientInfo;
 
 /**
@@ -841,31 +923,44 @@ typedef struct {
     UINT32 version; //!< Version of the structure
 
     PCHAR pChannelName; //!< Name of the signaling channel name. Maximum length is defined by MAX_CHANNEL_NAME_LEN + 1
-
+    // #http_api_createChannel
+    // #http_api_describeChannel
     PCHAR pChannelArn; //!< Channel Amazon Resource Name (ARN). This is an optional parameter
                        //!< Maximum length is defined by MAX_ARN_LEN+1
 
     PCHAR pRegion; //!< AWS Region in which the channel is to be opened. Can be empty for default
                    //!< Maximum length is defined by MAX_REGION_NAME_LEN+1
-
+    // #http_api_createChannel
+    // #http_api_describeChannel
+    // #http_api_getChannelEndpoint
+    // #http_api_getIceConfig
     PCHAR pControlPlaneUrl; //!< Optional fully qualified control plane URL
                             //!< Maximum length is defined by MAX_ARN_LEN+1
-
+    // #http_api_createChannel
+    // #http_api_describeChannel
+    // #http_api_getChannelEndpoint
     PCHAR pCertPath; //!< Optional certificate path. Maximum length is defined by MAX_PATH_LEN+1
-
+    // #http_api_createChannel
+    // #http_api_describeChannel
+    // #http_api_getChannelEndpoint
+    // #http_api_getIceConfig
     PCHAR pUserAgentPostfix; //!< Optional user agent post-fix. Maximum length is defined by
                              //!< MAX_CUSTOM_USER_AGENT_NAME_POSTFIX_LEN+1
 
     PCHAR pCustomUserAgent; //!< Optional custom user agent name. Maximum length is defined by MAX_USER_AGENT_LEN+1
 
     PCHAR pUserAgent; //!< Combined user agent.  Maximum length is defined by MAX_USER_AGENT_LEN+1
-
+    // #http_api_createChannel
+    // #http_api_describeChannel
+    // #http_api_getChannelEndpoint
+    // #http_api_getIceConfig
     PCHAR pKmsKeyId; //!< Optional KMS key id ARN. Maximum length is defined by MAX_ARN_LEN+1
 
     SIGNALING_CHANNEL_TYPE channelType; //!< Channel type when creating.
+                                        //!< #create_channel
 
     SIGNALING_CHANNEL_ROLE_TYPE channelRoleType; //!< Channel role type for the endpoint - master/viewer
-
+    // #http_api_getChannelEndpoint
     BOOL reserved; //!< Reserved field for compatibility
 
     UINT64 cachingPeriod; //!< Endpoint caching TTL.
@@ -879,6 +974,9 @@ typedef struct {
 
     UINT64 messageTtl; //!< The message TTL. Must be in the range of 5ns and 120ns.
                        //!< Specifying zero will default to 60ns
+                       //!< 5s~120s
+                       //!< The period of time a signaling channel retains undelivered messages before they are discarded.
+                       //!< #create_channel.
 
     UINT32 tagCount; //!< Number of tags associated with the stream
 
@@ -1077,7 +1175,7 @@ typedef struct {
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  * @{
  */
-PUBLIC_API STATUS createPeerConnection(PRtcConfiguration, PRtcPeerConnection*);
+PUBLIC_API STATUS pc_create(PRtcConfiguration, PRtcPeerConnection*);
 
 /**
  * @brief Free a RtcPeerConnection, NOT thread-safe.
@@ -1086,7 +1184,7 @@ PUBLIC_API STATUS createPeerConnection(PRtcConfiguration, PRtcPeerConnection*);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS freePeerConnection(PRtcPeerConnection* ppPeerConnection);
+PUBLIC_API STATUS pc_free(PRtcPeerConnection* ppPeerConnection);
 
 /**
  * @brief Set a callback when new Ice collects new local candidate.
@@ -1100,7 +1198,7 @@ PUBLIC_API STATUS freePeerConnection(PRtcPeerConnection* ppPeerConnection);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS peerConnectionOnIceCandidate(PRtcPeerConnection, UINT64, RtcOnIceCandidate);
+PUBLIC_API STATUS pc_onIceCandidate(PRtcPeerConnection, UINT64, RtcOnIceCandidate);
 
 #ifdef ENABLE_DATA_CHANNEL
 /**
@@ -1112,7 +1210,7 @@ PUBLIC_API STATUS peerConnectionOnIceCandidate(PRtcPeerConnection, UINT64, RtcOn
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS peerConnectionOnDataChannel(PRtcPeerConnection, UINT64, RtcOnDataChannel);
+PUBLIC_API STATUS pc_onDataChannel(PRtcPeerConnection, UINT64, RtcOnDataChannel);
 #endif
 /**
  * Set a callback for connection state change
@@ -1123,7 +1221,7 @@ PUBLIC_API STATUS peerConnectionOnDataChannel(PRtcPeerConnection, UINT64, RtcOnD
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS peerConnectionOnConnectionStateChange(PRtcPeerConnection, UINT64, RtcOnConnectionStateChange);
+PUBLIC_API STATUS pc_onConnectionStateChange(PRtcPeerConnection, UINT64, RtcOnConnectionStateChange);
 
 /**
  * Load the sdp field of PRtcSessionDescriptionInit with pending or current local session description
@@ -1133,7 +1231,7 @@ PUBLIC_API STATUS peerConnectionOnConnectionStateChange(PRtcPeerConnection, UINT
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS peerConnectionGetLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_getLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
  * Load the sdp field of PRtcSessionDescriptionInit with current local session description
@@ -1143,7 +1241,7 @@ PUBLIC_API STATUS peerConnectionGetLocalDescription(PRtcPeerConnection, PRtcSess
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS peerConnectionGetCurrentLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_getCurrentLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
  * @brief Populate the provided answer that contains an RFC 3264 offer
@@ -1156,12 +1254,12 @@ PUBLIC_API STATUS peerConnectionGetCurrentLocalDescription(PRtcPeerConnection, P
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS createOffer(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_createOffer(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
- * @brief The canTrickleIceCandidates attribute indicates whether the remote peer is able to accept trickled ICE candidates.
+ * @brief The pc_canTrickleIceCandidates attribute indicates whether the remote peer is able to accept trickled ICE candidates.
  * The value is determined based on whether a remote description indicates support for trickle ICE. Prior to the completion
- * of setRemoteDescription, this value is null.
+ * of pc_setRemoteDescription, this value is null.
  *
  * Reference: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-cantrickleicecandidates
  *
@@ -1169,7 +1267,7 @@ PUBLIC_API STATUS createOffer(PRtcPeerConnection, PRtcSessionDescriptionInit);
  *
  * @return NullableBool if not null, indicate whether remote support trickle ICE.
  */
-PUBLIC_API NullableBool canTrickleIceCandidates(PRtcPeerConnection);
+PUBLIC_API NullableBool pc_canTrickleIceCandidates(PRtcPeerConnection);
 
 /**
  * @brief Populate the provided answer that contains an RFC 3264 answer
@@ -1182,7 +1280,7 @@ PUBLIC_API NullableBool canTrickleIceCandidates(PRtcPeerConnection);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS createAnswer(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_createAnswer(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
  * @brief Create a JSON string from RtcSessionDescriptionInit
@@ -1193,7 +1291,7 @@ PUBLIC_API STATUS createAnswer(PRtcPeerConnection, PRtcSessionDescriptionInit);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS serializeSessionDescriptionInit(PRtcSessionDescriptionInit, PCHAR, PUINT32);
+PUBLIC_API STATUS sdp_serializeInit(PRtcSessionDescriptionInit, PCHAR, PUINT32);
 
 /**
  * @brief Parses a JSON string and returns an allocated PSessionDescriptionInit
@@ -1204,7 +1302,7 @@ PUBLIC_API STATUS serializeSessionDescriptionInit(PRtcSessionDescriptionInit, PC
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS deserializeSessionDescriptionInit(PCHAR, UINT32, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS sdp_deserializeInit(PCHAR, UINT32, PRtcSessionDescriptionInit);
 
 /**
  * @brief Parses a JSON string and populates a PRtcIceCandidateInit
@@ -1215,7 +1313,7 @@ PUBLIC_API STATUS deserializeSessionDescriptionInit(PCHAR, UINT32, PRtcSessionDe
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS deserializeRtcIceCandidateInit(PCHAR, UINT32, PRtcIceCandidateInit);
+PUBLIC_API STATUS sdp_deserializeRtcIceCandidateInit(PCHAR, UINT32, PRtcIceCandidateInit);
 
 /**
  * @brief Instructs the RtcPeerConnection to apply the supplied RtcSessionDescriptionInit
@@ -1228,7 +1326,7 @@ PUBLIC_API STATUS deserializeRtcIceCandidateInit(PCHAR, UINT32, PRtcIceCandidate
  *
  * @return - STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS setLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_setLocalDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
  * @brief Instructs the RtcPeerConnection to apply
@@ -1241,10 +1339,10 @@ PUBLIC_API STATUS setLocalDescription(PRtcPeerConnection, PRtcSessionDescription
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS setRemoteDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
+PUBLIC_API STATUS pc_setRemoteDescription(PRtcPeerConnection, PRtcSessionDescriptionInit);
 
 /**
- * @brief Instructs the RtcPeerConnection that ICE should be restarted. Subsequent calls to createOffer will create
+ * @brief Instructs the RtcPeerConnection that ICE should be restarted. Subsequent calls to pc_createOffer will create
  * descriptions to restart ICE.
  *
  * Reference: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-restartice
@@ -1253,7 +1351,7 @@ PUBLIC_API STATUS setRemoteDescription(PRtcPeerConnection, PRtcSessionDescriptio
  *
  * @return - STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS restartIce(PRtcPeerConnection);
+PUBLIC_API STATUS pc_restartIce(PRtcPeerConnection);
 
 /**
  * @brief Close the underlying DTLS session and IceAgent connection. Trigger RtcOnConnectionStateChange to RTC_PEER_CONNECTION_STATE_CLOSED
@@ -1264,7 +1362,7 @@ PUBLIC_API STATUS restartIce(PRtcPeerConnection);
  *
  * @return - STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS closePeerConnection(PRtcPeerConnection);
+PUBLIC_API STATUS pc_close(PRtcPeerConnection);
 
 /**
  * @brief Create a new RtcRtpTransceiver and add it to the set of transceivers.
@@ -1278,18 +1376,18 @@ PUBLIC_API STATUS closePeerConnection(PRtcPeerConnection);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS addTransceiver(PRtcPeerConnection, PRtcMediaStreamTrack, PRtcRtpTransceiverInit, PRtcRtpTransceiver*);
+PUBLIC_API STATUS pc_addTransceiver(PRtcPeerConnection, PRtcMediaStreamTrack, PRtcRtpTransceiverInit, PRtcRtpTransceiver*);
 
 /**
  * @brief Set a callback for transceiver frame
  *
- * @param[in] PRtcRtpTransceiver Populated RtcRtpTransceiver struct
- * @param[in] UINT64 User customData that will be passed along when RtcOnFrame is called
- * @param[in] RtcOnFrame User RtcOnFrame callback
+ * @param[in] pRtcRtpTransceiver Populated RtcRtpTransceiver struct
+ * @param[in] customData User customData that will be passed along when RtcOnFrame is called
+ * @param[in] rtcOnFrame User RtcOnFrame callback
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS transceiverOnFrame(PRtcRtpTransceiver, UINT64, RtcOnFrame);
+STATUS rtp_transceiver_onFrame(PRtcRtpTransceiver pRtcRtpTransceiver, UINT64 customData, RtcOnFrame rtcOnFrame);
 
 /**
  * @brief Set a callback for bandwidth estimation results
@@ -1300,7 +1398,7 @@ PUBLIC_API STATUS transceiverOnFrame(PRtcRtpTransceiver, UINT64, RtcOnFrame);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS transceiverOnBandwidthEstimation(PRtcRtpTransceiver, UINT64, RtcOnBandwidthEstimation);
+PUBLIC_API STATUS rtp_transceiver_onBandwidthEstimation(PRtcRtpTransceiver, UINT64, RtcOnBandwidthEstimation);
 
 /**
  * @brief Set a callback for picture loss packet (PLI)
@@ -1311,33 +1409,33 @@ PUBLIC_API STATUS transceiverOnBandwidthEstimation(PRtcRtpTransceiver, UINT64, R
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS transceiverOnPictureLoss(PRtcRtpTransceiver, UINT64, RtcOnPictureLoss);
+PUBLIC_API STATUS rtp_transceiver_onPictureLoss(PRtcRtpTransceiver, UINT64, RtcOnPictureLoss);
 
 /**
  * @brief Frees the previously created transceiver object
  *
- * This method is currently a no-op as Transceivers are freed when freePeerConnection is called
+ * This method is currently a no-op as Transceivers are freed when pc_free is called
  * in the future when renegotiation is supported this will be useful to remove Transceivers at anytime
  *
  * @param[in,out/opt] PRtcRtpTransceiver* in,out/OPT RtcRtpTransceiver to be freed
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS freeTransceiver(PRtcRtpTransceiver*);
+PUBLIC_API STATUS rtp_freeTransceiver(PRtcRtpTransceiver*);
 
 /**
  * @brief Initializes global state needed for all RtcPeerConnections. It must only be called once
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS initKvsWebRtc(VOID);
+PUBLIC_API STATUS pc_initWebRtc(VOID);
 
 /**
  * @brief Deinitializes global state needed for all RtcPeerConnections. It must only be called once
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS deinitKvsWebRtc(VOID);
+PUBLIC_API STATUS pc_deinitWebRtc(VOID);
 
 /**
  * @brief Adds to the list of codecs we support receiving.
@@ -1349,7 +1447,7 @@ PUBLIC_API STATUS deinitKvsWebRtc(VOID);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS addSupportedCodec(PRtcPeerConnection, RTC_CODEC);
+PUBLIC_API STATUS pc_addSupportedCodec(PRtcPeerConnection, RTC_CODEC);
 
 /**
  * @brief Packetizes and sends media via the configuration specified by the RtcRtpTransceiver
@@ -1359,14 +1457,14 @@ PUBLIC_API STATUS addSupportedCodec(PRtcPeerConnection, RTC_CODEC);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS writeFrame(PRtcRtpTransceiver, PFrame);
+PUBLIC_API STATUS rtp_writeFrame(PRtcRtpTransceiver, PFrame);
 
 /** @brief call this function to update stats which depend on external encoder
  *  @param[in] PRtcRtpTransceiver transceiver for which encoder stats will be updated
  *  @param[in] PRtcEncoderStats populated in the application layer which is then consumed as part
  *  of outgoingRtpStats
  */
-PUBLIC_API STATUS updateEncoderStats(PRtcRtpTransceiver, PRtcEncoderStats);
+PUBLIC_API STATUS rtp_transceiver_updateEncoderStats(PRtcRtpTransceiver, PRtcEncoderStats);
 
 /**
  * @brief Provides a remote candidate to the ICE Agent.
@@ -1381,10 +1479,10 @@ PUBLIC_API STATUS updateEncoderStats(PRtcRtpTransceiver, PRtcEncoderStats);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS addIceCandidate(PRtcPeerConnection, PCHAR);
+PUBLIC_API STATUS pc_addIceCandidate(PRtcPeerConnection, PCHAR);
 
 /**
- * @brief createDataChannel creates a new RtcDataChannel object with the given label.
+ * @brief data_channel_create creates a new RtcDataChannel object with the given label.
  *
  * NOTE: The RtcDataChannelInit dictionary can be used to configure properties of the underlying
  * channel such as data reliability.
@@ -1399,29 +1497,29 @@ PUBLIC_API STATUS addIceCandidate(PRtcPeerConnection, PCHAR);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS createDataChannel(PRtcPeerConnection, PCHAR, PRtcDataChannelInit, PRtcDataChannel*);
+PUBLIC_API STATUS data_channel_create(PRtcPeerConnection, PCHAR, PRtcDataChannelInit, PRtcDataChannel*);
 
 /**
  * @brief Set a callback for data channel message
  *
- * @param[in] PRtcDataChannel Data channel struct created by createDataChannel()
+ * @param[in] PRtcDataChannel Data channel struct created by data_channel_create()
  * @param[in] UINT64 User customData that will be passed along when RtcOnMessage is called
  * @param[in] RtcOnMessage User RtcOnMessage callback
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS dataChannelOnMessage(PRtcDataChannel, UINT64, RtcOnMessage);
+PUBLIC_API STATUS data_channel_onMessage(PRtcDataChannel, UINT64, RtcOnMessage);
 
 /**
  * @brief Set a callback for data channel open
  *
- * @param[in] PRtcDataChannel Data channel struct created by createDataChannel()
+ * @param[in] PRtcDataChannel Data channel struct created by data_channel_create()
  * @param[in] UINT64 User customData that will be passed along when RtcOnOpen is called
  * @param[in] RtcOnOpen User RtcOnOpen callback
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS dataChannelOnOpen(PRtcDataChannel, UINT64, RtcOnOpen);
+PUBLIC_API STATUS data_channel_onOpen(PRtcDataChannel, UINT64, RtcOnOpen);
 
 /**
  * @brief Send data via the PRtcDataChannel
@@ -1436,7 +1534,7 @@ PUBLIC_API STATUS dataChannelOnOpen(PRtcDataChannel, UINT64, RtcOnOpen);
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  *
  */
-PUBLIC_API STATUS dataChannelSend(PRtcDataChannel, BOOL, PBYTE, UINT32);
+PUBLIC_API STATUS data_channel_send(PRtcDataChannel, BOOL, PBYTE, UINT32);
 
 /**
  * @brief Use the process described in https://tools.ietf.org/html/rfc5780#section-4.3 to
@@ -1474,8 +1572,8 @@ PUBLIC_API PCHAR getNatBehaviorStr(NAT_BEHAVIOR natBehavior);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientCreate(PSignalingClientInfo, PChannelInfo, PSignalingClientCallbacks, PAwsCredentialProvider,
-                                        PSIGNALING_CLIENT_HANDLE);
+PUBLIC_API STATUS signaling_client_create(PSignalingClientInfo, PChannelInfo, PSignalingClientCallbacks, PAwsCredentialProvider,
+                                          PSIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Frees the Signaling client object
@@ -1486,7 +1584,7 @@ PUBLIC_API STATUS signalingClientCreate(PSignalingClientInfo, PChannelInfo, PSig
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientFree(PSIGNALING_CLIENT_HANDLE);
+PUBLIC_API STATUS signaling_client_free(PSIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Send a message through a Signaling client.
@@ -1499,7 +1597,7 @@ PUBLIC_API STATUS signalingClientFree(PSIGNALING_CLIENT_HANDLE);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientSendMessage(SIGNALING_CLIENT_HANDLE, PSignalingMessage);
+PUBLIC_API STATUS signaling_client_sendMsg(SIGNALING_CLIENT_HANDLE, PSignalingMessage);
 
 /**
  * @brief Gets the retrieved ICE configuration information object count
@@ -1511,7 +1609,7 @@ PUBLIC_API STATUS signalingClientSendMessage(SIGNALING_CLIENT_HANDLE, PSignaling
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientGetIceConfigInfoCount(SIGNALING_CLIENT_HANDLE, PUINT32);
+PUBLIC_API STATUS signaling_client_getIceConfigInfoCount(SIGNALING_CLIENT_HANDLE, PUINT32);
 
 /**
  * @brief Gets the ICE configuration information object given its index
@@ -1526,7 +1624,7 @@ PUBLIC_API STATUS signalingClientGetIceConfigInfoCount(SIGNALING_CLIENT_HANDLE, 
  *
  * @return STATUS code of execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientGetIceConfigInfo(SIGNALING_CLIENT_HANDLE, UINT32, PIceConfigInfo*);
+PUBLIC_API STATUS signaling_client_getIceConfigInfo(SIGNALING_CLIENT_HANDLE, UINT32, PIceConfigInfo*);
 
 /**
  * @brief Connects the signaling client to the web socket in order to send/receive messages.
@@ -1537,7 +1635,7 @@ PUBLIC_API STATUS signalingClientGetIceConfigInfo(SIGNALING_CLIENT_HANDLE, UINT3
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientConnect(SIGNALING_CLIENT_HANDLE);
+PUBLIC_API STATUS signaling_client_connect(SIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Disconnects the signaling client.
@@ -1546,7 +1644,7 @@ PUBLIC_API STATUS signalingClientConnect(SIGNALING_CLIENT_HANDLE);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientDisconnect(SIGNALING_CLIENT_HANDLE);
+PUBLIC_API STATUS signaling_client_disconnect(SIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Gets the Signaling client current state.
@@ -1556,7 +1654,7 @@ PUBLIC_API STATUS signalingClientDisconnect(SIGNALING_CLIENT_HANDLE);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientGetCurrentState(SIGNALING_CLIENT_HANDLE, PSIGNALING_CLIENT_STATE);
+PUBLIC_API STATUS signaling_client_getCurrentState(SIGNALING_CLIENT_HANDLE, PSIGNALING_CLIENT_STATE);
 
 /**
  * Gets a literal string representing a Signaling client state.
@@ -1566,7 +1664,7 @@ PUBLIC_API STATUS signalingClientGetCurrentState(SIGNALING_CLIENT_HANDLE, PSIGNA
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientGetStateString(SIGNALING_CLIENT_STATE, PCHAR*);
+PUBLIC_API STATUS signaling_client_getStateString(SIGNALING_CLIENT_STATE, PCHAR*);
 
 /**
  * @brief Deletes the signaling channel referenced by SIGNALING_CLIENT_HANDLE
@@ -1584,7 +1682,7 @@ PUBLIC_API STATUS signalingClientGetStateString(SIGNALING_CLIENT_STATE, PCHAR*);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS signalingClientDelete(SIGNALING_CLIENT_HANDLE);
+PUBLIC_API STATUS signaling_client_delete(SIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Get signaling related metrics
@@ -1592,7 +1690,7 @@ PUBLIC_API STATUS signalingClientDelete(SIGNALING_CLIENT_HANDLE);
  * @param[in] SIGNALING_CLIENT_HANDLE Signaling client handle
  * @param[in,out] PSignalingClientMetrics Signaling stats
  */
-PUBLIC_API STATUS signalingClientGetMetrics(SIGNALING_CLIENT_HANDLE, PSignalingClientMetrics);
+PUBLIC_API STATUS signaling_client_getMetrics(SIGNALING_CLIENT_HANDLE, PSignalingClientMetrics);
 
 /**
  * @brief Get the relevant/all metrics based on the RTCStatsType field. This does not include
@@ -1611,7 +1709,7 @@ PUBLIC_API STATUS signalingClientGetMetrics(SIGNALING_CLIENT_HANDLE, PSignalingC
  *
  * Reference: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface-extensions-1
  */
-PUBLIC_API STATUS rtcPeerConnectionGetMetrics(PRtcPeerConnection, PRtcRtpTransceiver, PRtcStats);
+PUBLIC_API STATUS metrics_get(PRtcPeerConnection, PRtcRtpTransceiver, PRtcStats);
 
 /**
  * @brief Creates an RtcCertificate object
@@ -1620,7 +1718,7 @@ PUBLIC_API STATUS rtcPeerConnectionGetMetrics(PRtcPeerConnection, PRtcRtpTransce
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS createRtcCertificate(PRtcCertificate*);
+PUBLIC_API STATUS rtc_certificate_create(PRtcCertificate*);
 
 /**
  * @brief Frees previously generated RtcCertificate object
@@ -1629,7 +1727,7 @@ PUBLIC_API STATUS createRtcCertificate(PRtcCertificate*);
  *
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
-PUBLIC_API STATUS freeRtcCertificate(PRtcCertificate);
+PUBLIC_API STATUS rtc_certificate_free(PRtcCertificate);
 
 /*!@} */
 #ifdef __cplusplus

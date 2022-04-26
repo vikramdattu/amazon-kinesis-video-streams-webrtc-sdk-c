@@ -18,10 +18,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-// Hash table functionality
-//////////////////////////////////////////////////////////////////////////////////////////////////////
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
+#include "kvs/error.h"
+#include "kvs/common_defs.h"
 
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
 /**
  * Hash table declaration
  * NOTE: Variable size structure - the buckets follow directly after the main structure
@@ -78,6 +83,9 @@ PHashBucket getHashBucket(PHashTable, UINT64);
  */
 typedef STATUS (*HashEntryCallbackFunc)(UINT64, PHashEntry);
 
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 /**
  * Create a new hash table with default parameters
  */
@@ -86,32 +94,32 @@ STATUS hashTableCreate(PHashTable*);
 /**
  * Create a new hash table with specific parameters
  */
-STATUS hashTableCreateWithParams(UINT32, UINT32, PHashTable*);
+STATUS hash_table_createWithParams(UINT32, UINT32, PHashTable*);
 
 /**
  * Frees and de-allocates the hash table
  */
-STATUS hashTableFree(PHashTable);
+STATUS hash_table_free(PHashTable);
 
 /**
  * Clears all the items and the buckets
  */
-STATUS hashTableClear(PHashTable);
+STATUS hash_table_clear(PHashTable);
 
 /**
  * Gets the number of items in the hash table
  */
-STATUS hashTableGetCount(PHashTable, PUINT32);
+STATUS hash_table_getCount(PHashTable, PUINT32);
 
 /**
  * Whether the hash table is empty
  */
-STATUS hashTableIsEmpty(PHashTable, PBOOL);
+STATUS hash_table_isEmpty(PHashTable, PBOOL);
 
 /**
  * Puts an item into the hash table
  */
-STATUS hashTablePut(PHashTable, UINT64, UINT64);
+STATUS hash_table_put(PHashTable, UINT64, UINT64);
 
 /**
  * Upserts an item into the hash table
@@ -121,17 +129,17 @@ STATUS hashTableUpsert(PHashTable, UINT64, UINT64);
 /**
  * Gets an item from the hash table
  */
-STATUS hashTableGet(PHashTable, UINT64, PUINT64);
+STATUS hash_table_get(PHashTable, UINT64, PUINT64);
 
 /**
  * Checks whether an item exists in the hash table
  */
-STATUS hashTableContains(PHashTable, UINT64, PBOOL);
+STATUS hash_table_contains(PHashTable, UINT64, PBOOL);
 
 /**
  * Removes an item from the hash table. If the bucket is empty it's deleted. The existing items will be shifted.
  */
-STATUS hashTableRemove(PHashTable, UINT64);
+STATUS hash_table_remove(PHashTable, UINT64);
 
 /**
  * Gets the number of buckets

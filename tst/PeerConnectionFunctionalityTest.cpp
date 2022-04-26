@@ -17,16 +17,16 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeers)
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithDelay)
@@ -38,24 +38,24 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithDelay)
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     auto onICECandidateHdlr = [](UINT64 customData, PCHAR candidateStr) -> void {
         if (candidateStr != NULL) {
             std::thread(
                 [customData](std::string candidate) {
                     RtcIceCandidateInit iceCandidate;
-                    EXPECT_EQ(STATUS_SUCCESS, deserializeRtcIceCandidateInit((PCHAR) candidate.c_str(), STRLEN(candidate.c_str()), &iceCandidate));
-                    EXPECT_EQ(STATUS_SUCCESS, addIceCandidate((PRtcPeerConnection) customData, iceCandidate.candidate));
+                    EXPECT_EQ(STATUS_SUCCESS, sdp_deserializeRtcIceCandidateInit((PCHAR) candidate.c_str(), STRLEN(candidate.c_str()), &iceCandidate));
+                    EXPECT_EQ(STATUS_SUCCESS, pc_addIceCandidate((PRtcPeerConnection) customData, iceCandidate.candidate));
                 },
                 std::string(candidateStr))
                 .detach();
         }
     };
 
-    EXPECT_EQ(STATUS_SUCCESS, peerConnectionOnIceCandidate(offerPc, (UINT64) answerPc, onICECandidateHdlr));
-    EXPECT_EQ(STATUS_SUCCESS, peerConnectionOnIceCandidate(answerPc, (UINT64) offerPc, onICECandidateHdlr));
+    EXPECT_EQ(STATUS_SUCCESS, pc_onIceCandidate(offerPc, (UINT64) answerPc, onICECandidateHdlr));
+    EXPECT_EQ(STATUS_SUCCESS, pc_onIceCandidate(answerPc, (UINT64) offerPc, onICECandidateHdlr));
 
     auto onICEConnectionStateChangeHdlr = [](UINT64 customData, RTC_PEER_CONNECTION_STATE newState) -> void {
         if (newState == RTC_PEER_CONNECTION_STATE_CONNECTED) {
@@ -63,19 +63,19 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithDelay)
         }
     };
 
-    EXPECT_EQ(STATUS_SUCCESS, peerConnectionOnConnectionStateChange(offerPc, (UINT64) &connectedCount, onICEConnectionStateChangeHdlr));
-    EXPECT_EQ(STATUS_SUCCESS, peerConnectionOnConnectionStateChange(answerPc, (UINT64) &connectedCount, onICEConnectionStateChangeHdlr));
+    EXPECT_EQ(STATUS_SUCCESS, pc_onConnectionStateChange(offerPc, (UINT64) &connectedCount, onICEConnectionStateChangeHdlr));
+    EXPECT_EQ(STATUS_SUCCESS, pc_onConnectionStateChange(answerPc, (UINT64) &connectedCount, onICEConnectionStateChangeHdlr));
 
-    EXPECT_EQ(STATUS_SUCCESS, createOffer(offerPc, &sdp));
-    EXPECT_EQ(STATUS_SUCCESS, setLocalDescription(offerPc, &sdp));
-    EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(answerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createOffer(offerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_setLocalDescription(offerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(answerPc, &sdp));
 
-    EXPECT_EQ(STATUS_SUCCESS, createAnswer(answerPc, &sdp));
-    EXPECT_EQ(STATUS_SUCCESS, setLocalDescription(answerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_createAnswer(answerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_setLocalDescription(answerPc, &sdp));
 
     THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
 
-    EXPECT_EQ(STATUS_SUCCESS, setRemoteDescription(offerPc, &sdp));
+    EXPECT_EQ(STATUS_SUCCESS, pc_setRemoteDescription(offerPc, &sdp));
 
     for (auto i = 0; i <= 100 && ATOMIC_LOAD(&connectedCount) != 2; i++) {
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
@@ -83,11 +83,11 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithDelay)
 
     EXPECT_EQ(2, connectedCount);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 #ifdef KVS_USE_OPENSSL
@@ -103,12 +103,12 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithPresetCerts)
     CHAR answerCertFingerprint[CERTIFICATE_FINGERPRINT_LENGTH];
 
     // Generate offer cert
-    ASSERT_EQ(STATUS_SUCCESS, createCertificateAndKey(GENERATED_CERTIFICATE_BITS, true, &pOfferCert, &pOfferKey));
-    ASSERT_EQ(STATUS_SUCCESS, dtlsCertificateFingerprint(pOfferCert, offerCertFingerprint));
+    ASSERT_EQ(STATUS_SUCCESS, certificate_key_create(GENERATED_CERTIFICATE_BITS, true, &pOfferCert, &pOfferKey));
+    ASSERT_EQ(STATUS_SUCCESS, dtls_session_calculateCertificateFingerprint(pOfferCert, offerCertFingerprint));
 
     // Generate answer cert
-    ASSERT_EQ(STATUS_SUCCESS, createCertificateAndKey(GENERATED_CERTIFICATE_BITS, true, &pAnswerCert, &pAnswerKey));
-    ASSERT_EQ(STATUS_SUCCESS, dtlsCertificateFingerprint(pAnswerCert, answerCertFingerprint));
+    ASSERT_EQ(STATUS_SUCCESS, certificate_key_create(GENERATED_CERTIFICATE_BITS, true, &pAnswerCert, &pAnswerKey));
+    ASSERT_EQ(STATUS_SUCCESS, dtls_session_calculateCertificateFingerprint(pAnswerCert, answerCertFingerprint));
 
     MEMSET(&offerConfig, 0x00, SIZEOF(RtcConfiguration));
     offerConfig.certificates[0].pCertificate = (PBYTE) pOfferCert;
@@ -122,20 +122,20 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithPresetCerts)
     answerConfig.certificates[0].pPrivateKey = (PBYTE) pAnswerKey;
     answerConfig.certificates[0].privateKeySize = 0;
 
-    EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&offerConfig, &offerPc));
-    EXPECT_EQ(STATUS_SUCCESS, createPeerConnection(&answerConfig, &answerPc));
+    EXPECT_EQ(STATUS_SUCCESS, pc_create(&offerConfig, &offerPc));
+    EXPECT_EQ(STATUS_SUCCESS, pc_create(&answerConfig, &answerPc));
 
     // Should be fine to free right after create peer connection
-    freeCertificateAndKey(&pOfferCert, &pOfferKey);
-    freeCertificateAndKey(&pAnswerCert, &pAnswerKey);
+    certificate_key_free(&pOfferCert, &pOfferKey);
+    certificate_key_free(&pAnswerCert, &pAnswerKey);
 
     EXPECT_EQ(TRUE, connectTwoPeers(offerPc, answerPc, offerCertFingerprint, answerCertFingerprint));
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 #elif KVS_USE_MBEDTLS
 TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithPresetCerts)
@@ -150,12 +150,12 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithPresetCerts)
     CHAR answerCertFingerprint[CERTIFICATE_FINGERPRINT_LENGTH];
 
     // Generate offer cert
-    ASSERT_EQ(STATUS_SUCCESS, createCertificateAndKey(GENERATED_CERTIFICATE_BITS, true, &offerCert, &offerKey));
-    ASSERT_EQ(STATUS_SUCCESS, dtlsCertificateFingerprint(&offerCert, offerCertFingerprint));
+    ASSERT_EQ(STATUS_SUCCESS, certificate_key_create(GENERATED_CERTIFICATE_BITS, true, &offerCert, &offerKey));
+    ASSERT_EQ(STATUS_SUCCESS, dtls_session_calculateCertificateFingerprint(&offerCert, offerCertFingerprint));
 
     // Generate answer cert
-    ASSERT_EQ(STATUS_SUCCESS, createCertificateAndKey(GENERATED_CERTIFICATE_BITS, true, &answerCert, &answerKey));
-    ASSERT_EQ(STATUS_SUCCESS, dtlsCertificateFingerprint(&answerCert, answerCertFingerprint));
+    ASSERT_EQ(STATUS_SUCCESS, certificate_key_create(GENERATED_CERTIFICATE_BITS, true, &answerCert, &answerKey));
+    ASSERT_EQ(STATUS_SUCCESS, dtls_session_calculateCertificateFingerprint(&answerCert, answerCertFingerprint));
 
     MEMSET(&offerConfig, 0x00, SIZEOF(RtcConfiguration));
     offerConfig.certificates[0].pCertificate = (PBYTE) &offerCert;
@@ -169,20 +169,20 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithPresetCerts)
     answerConfig.certificates[0].pPrivateKey = (PBYTE) &answerKey;
     answerConfig.certificates[0].privateKeySize = 0;
 
-    ASSERT_EQ(STATUS_SUCCESS, createPeerConnection(&offerConfig, &offerPc));
-    ASSERT_EQ(STATUS_SUCCESS, createPeerConnection(&answerConfig, &answerPc));
+    ASSERT_EQ(STATUS_SUCCESS, pc_create(&offerConfig, &offerPc));
+    ASSERT_EQ(STATUS_SUCCESS, pc_create(&answerConfig, &answerPc));
 
     // Should be fine to free right after create peer connection
-    freeCertificateAndKey(&offerCert, &offerKey);
-    freeCertificateAndKey(&answerCert, &answerKey);
+    certificate_key_free(&offerCert, &offerKey);
+    certificate_key_free(&answerCert, &answerKey);
 
     ASSERT_EQ(TRUE, connectTwoPeers(offerPc, answerPc, offerCertFingerprint, answerCertFingerprint));
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 #endif
 
@@ -202,16 +202,16 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersForcedTURN)
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -233,8 +233,8 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundBeforeTurnEstab
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
@@ -242,7 +242,7 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundBeforeTurnEstab
 
     pIceAgent = ((PKvsPeerConnection) offerPc)->pIceAgent;
     MUTEX_LOCK(pIceAgent->lock);
-    EXPECT_EQ(doubleListGetHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
+    EXPECT_EQ(double_list_getHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
     while (pCurNode != NULL) {
         pIceCandidate = (PIceCandidate) pCurNode->data;
         pCurNode = pCurNode->pNext;
@@ -256,7 +256,7 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundBeforeTurnEstab
 
     pIceAgent = ((PKvsPeerConnection) answerPc)->pIceAgent;
     MUTEX_LOCK(pIceAgent->lock);
-    EXPECT_EQ(doubleListGetHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
+    EXPECT_EQ(double_list_getHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
     while (pCurNode != NULL) {
         pIceCandidate = (PIceCandidate) pCurNode->data;
         pCurNode = pCurNode->pNext;
@@ -268,11 +268,11 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundBeforeTurnEstab
     }
     MUTEX_UNLOCK(pIceAgent->lock);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -297,8 +297,8 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     auto onICECandidateHdlr = [](UINT64 customData, PCHAR candidateStr) -> void {
         PSIZE_T pDoneGatherCandidate = (PSIZE_T) customData;
@@ -307,19 +307,19 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
         }
     };
 
-    EXPECT_EQ(peerConnectionOnIceCandidate(offerPc, (UINT64) &offerPcDoneGatherCandidate, onICECandidateHdlr), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnIceCandidate(answerPc, (UINT64) &answerPcDoneGatherCandidate, onICECandidateHdlr), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onIceCandidate(offerPc, (UINT64) &offerPcDoneGatherCandidate, onICECandidateHdlr), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onIceCandidate(answerPc, (UINT64) &answerPcDoneGatherCandidate, onICECandidateHdlr), STATUS_SUCCESS);
 
     auto onICEConnectionStateChangeHdlr = [](UINT64 customData, RTC_PEER_CONNECTION_STATE newState) -> void {
         ATOMIC_INCREMENT((PSIZE_T) customData + newState);
     };
 
-    EXPECT_EQ(peerConnectionOnConnectionStateChange(offerPc, (UINT64) this->stateChangeCount, onICEConnectionStateChangeHdlr), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionOnConnectionStateChange(answerPc, (UINT64) this->stateChangeCount, onICEConnectionStateChangeHdlr), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onConnectionStateChange(offerPc, (UINT64) this->stateChangeCount, onICEConnectionStateChangeHdlr), STATUS_SUCCESS);
+    EXPECT_EQ(pc_onConnectionStateChange(answerPc, (UINT64) this->stateChangeCount, onICEConnectionStateChangeHdlr), STATUS_SUCCESS);
 
     // start gathering candidates
-    EXPECT_EQ(setLocalDescription(offerPc, &sdp), STATUS_SUCCESS);
-    EXPECT_EQ(setLocalDescription(answerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_setLocalDescription(offerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_setLocalDescription(answerPc, &sdp), STATUS_SUCCESS);
 
     // give time for turn allocation to be finished
     candidateGatherTimeout = GETTIME() + KVS_ICE_GATHER_REFLEXIVE_AND_RELAYED_CANDIDATE_TIMEOUT + 2 * HUNDREDS_OF_NANOS_IN_A_SECOND;
@@ -330,13 +330,13 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
     EXPECT_TRUE(ATOMIC_LOAD(&offerPcDoneGatherCandidate) > 0);
     EXPECT_TRUE(ATOMIC_LOAD(&answerPcDoneGatherCandidate) > 0);
 
-    EXPECT_EQ(createOffer(offerPc, &sdp), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionGetCurrentLocalDescription(offerPc, &sdp), STATUS_SUCCESS);
-    EXPECT_EQ(setRemoteDescription(answerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_createOffer(offerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_getCurrentLocalDescription(offerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_setRemoteDescription(answerPc, &sdp), STATUS_SUCCESS);
 
-    EXPECT_EQ(createAnswer(answerPc, &sdp), STATUS_SUCCESS);
-    EXPECT_EQ(peerConnectionGetCurrentLocalDescription(answerPc, &sdp), STATUS_SUCCESS);
-    EXPECT_EQ(setRemoteDescription(offerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_createAnswer(answerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_getCurrentLocalDescription(answerPc, &sdp), STATUS_SUCCESS);
+    EXPECT_EQ(pc_setRemoteDescription(offerPc, &sdp), STATUS_SUCCESS);
 
     for (auto i = 0; i <= 100 && ATOMIC_LOAD(&this->stateChangeCount[RTC_PEER_CONNECTION_STATE_CONNECTED]) != 2; i++) {
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_SECOND);
@@ -349,7 +349,7 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
 
     pIceAgent = ((PKvsPeerConnection) offerPc)->pIceAgent;
     MUTEX_LOCK(pIceAgent->lock);
-    EXPECT_EQ(doubleListGetHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
+    EXPECT_EQ(double_list_getHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
     while (pCurNode != NULL) {
         pIceCandidate = (PIceCandidate) pCurNode->data;
         pCurNode = pCurNode->pNext;
@@ -363,7 +363,7 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
 
     pIceAgent = ((PKvsPeerConnection) answerPc)->pIceAgent;
     MUTEX_LOCK(pIceAgent->lock);
-    EXPECT_EQ(doubleListGetHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
+    EXPECT_EQ(double_list_getHeadNode(pIceAgent->localCandidates, &pCurNode), STATUS_SUCCESS);
     while (pCurNode != NULL) {
         pIceCandidate = (PIceCandidate) pCurNode->data;
         pCurNode = pCurNode->pNext;
@@ -375,11 +375,11 @@ TEST_F(PeerConnectionFunctionalityTest, shutdownTurnDueToP2PFoundAfterTurnEstabl
     }
     MUTEX_UNLOCK(pIceAgent->lock);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -395,16 +395,16 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersWithHostAndStun)
     // Set the  STUN server
     SNPRINTF(configuration.iceServers[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, TEST_DEFAULT_REGION);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 // Assert that two PeerConnections can connect and then terminate one of them, the other one will eventually report disconnection
@@ -420,13 +420,13 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersThenDisconnectTest)
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
     // free offerPc so it wont send anymore keep alives and answerPc will detect disconnection
-    freePeerConnection(&offerPc);
+    pc_free(&offerPc);
 
     THREAD_SLEEP(KVS_ICE_ENTER_STATE_DISCONNECTION_GRACE_PERIOD);
 
@@ -440,7 +440,7 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersThenDisconnectTest)
 
     EXPECT_TRUE(ATOMIC_LOAD(&stateChangeCount[RTC_PEER_CONNECTION_STATE_DISCONNECTED]) > 0);
 
-    freePeerConnection(&answerPc);
+    pc_free(&answerPc);
 }
 
 // Assert that PeerConnection will go to failed state when no turn server was given in turn only mode.
@@ -452,8 +452,8 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersExpectFailureBecauseNoCan
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
     configuration.iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), FALSE);
 
@@ -461,11 +461,11 @@ TEST_F(PeerConnectionFunctionalityTest, connectTwoPeersExpectFailureBecauseNoCan
     THREAD_SLEEP(KVS_ICE_GATHER_REFLEXIVE_AND_RELAYED_CANDIDATE_TIMEOUT);
     EXPECT_TRUE(ATOMIC_LOAD(&stateChangeCount[RTC_PEER_CONNECTION_STATE_FAILED]) == 2);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 // Assert that two PeerConnections can connect and then send media until the receiver gets both audio/video
@@ -487,8 +487,8 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMedia)
     videoFrame.size = TEST_VIDEO_FRAME_SIZE;
     MEMSET(videoFrame.frameData, 0x11, videoFrame.size);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     addTrackToPeerConnection(offerPc, &offerVideoTrack, &offerVideoTransceiver, RTC_CODEC_VP8, MEDIA_STREAM_TRACK_KIND_VIDEO);
     addTrackToPeerConnection(offerPc, &offerAudioTrack, &offerAudioTransceiver, RTC_CODEC_OPUS, MEDIA_STREAM_TRACK_KIND_AUDIO);
@@ -499,12 +499,12 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMedia)
         UNUSED_PARAM(pFrame);
         ATOMIC_STORE((PSIZE_T) customData, 1);
     };
-    EXPECT_EQ(transceiverOnFrame(answerVideoTransceiver, (UINT64) &seenVideo, onFrameHandler), STATUS_SUCCESS);
+    EXPECT_EQ(rtp_transceiver_onFrame(answerVideoTransceiver, (UINT64) &seenVideo, onFrameHandler), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
     for (auto i = 0; i <= 1000 && ATOMIC_LOAD(&seenVideo) != 1; i++) {
-        EXPECT_EQ(writeFrame(offerVideoTransceiver, &videoFrame), STATUS_SUCCESS);
+        EXPECT_EQ(rtp_writeFrame(offerVideoTransceiver, &videoFrame), STATUS_SUCCESS);
         videoFrame.presentationTs += (HUNDREDS_OF_NANOS_IN_A_SECOND / 25);
 
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
@@ -512,7 +512,7 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMedia)
 
     MEMFREE(videoFrame.frameData);
     RtcOutboundRtpStreamStats stats{};
-    EXPECT_EQ(STATUS_SUCCESS, getRtpOutboundStats(offerPc, offerVideoTransceiver, &stats));
+    EXPECT_EQ(STATUS_SUCCESS, metrics_getRtpOutboundStats(offerPc, offerVideoTransceiver, &stats));
     EXPECT_EQ(206, stats.sent.packetsSent);
 #ifdef KVS_USE_MBEDTLS
     EXPECT_EQ(248026, stats.sent.bytesSent);
@@ -524,18 +524,18 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMedia)
     EXPECT_LT(0, stats.lastPacketSentTimestamp);
 
     RtcInboundRtpStreamStats answerStats{};
-    EXPECT_EQ(STATUS_SUCCESS, getRtpInboundStats(answerPc, answerVideoTransceiver, &answerStats));
+    EXPECT_EQ(STATUS_SUCCESS, metrics_getRtpInboundStats(answerPc, answerVideoTransceiver, &answerStats));
     EXPECT_LE(1, answerStats.framesReceived);
     EXPECT_LT(103, answerStats.received.packetsReceived);
     EXPECT_LT(120000, answerStats.bytesReceived);
     EXPECT_LT(1234, answerStats.headerBytesReceived);
     EXPECT_LT(0, answerStats.lastPacketReceivedTimestamp);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     EXPECT_EQ(ATOMIC_LOAD(&seenVideo), 1);
 }
@@ -563,9 +563,9 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMediaRSA)
     videoFrame.size = TEST_VIDEO_FRAME_SIZE;
     MEMSET(videoFrame.frameData, 0x11, videoFrame.size);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
     configuration.kvsRtcConfiguration.generateRSACertificate = TRUE;
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     addTrackToPeerConnection(offerPc, &offerVideoTrack, &offerVideoTransceiver, RTC_CODEC_VP8, MEDIA_STREAM_TRACK_KIND_VIDEO);
     addTrackToPeerConnection(offerPc, &offerAudioTrack, &offerAudioTransceiver, RTC_CODEC_OPUS, MEDIA_STREAM_TRACK_KIND_AUDIO);
@@ -576,12 +576,12 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMediaRSA)
         UNUSED_PARAM(pFrame);
         ATOMIC_STORE((PSIZE_T) customData, 1);
     };
-    EXPECT_EQ(transceiverOnFrame(answerVideoTransceiver, (UINT64) &seenVideo, onFrameHandler), STATUS_SUCCESS);
+    EXPECT_EQ(rtp_transceiver_onFrame(answerVideoTransceiver, (UINT64) &seenVideo, onFrameHandler), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
     for (auto i = 0; i <= 1000 && ATOMIC_LOAD(&seenVideo) != 1; i++) {
-        EXPECT_EQ(writeFrame(offerVideoTransceiver, &videoFrame), STATUS_SUCCESS);
+        EXPECT_EQ(rtp_writeFrame(offerVideoTransceiver, &videoFrame), STATUS_SUCCESS);
         videoFrame.presentationTs += (HUNDREDS_OF_NANOS_IN_A_SECOND / 25);
 
         THREAD_SLEEP(HUNDREDS_OF_NANOS_IN_A_MILLISECOND);
@@ -589,11 +589,11 @@ TEST_F(PeerConnectionFunctionalityTest, exchangeMediaRSA)
 
     MEMFREE(videoFrame.frameData);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     EXPECT_EQ(ATOMIC_LOAD(&seenVideo), 1);
 }
@@ -605,23 +605,23 @@ TEST_F(PeerConnectionFunctionalityTest, iceRestartTest)
 
     MEMSET(&configuration, 0x00, SIZEOF(RtcConfiguration));
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    EXPECT_EQ(restartIce(offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_restartIce(offerPc), STATUS_SUCCESS);
 
     /* reset state change count */
     MEMSET(&stateChangeCount, 0x00, SIZEOF(stateChangeCount));
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 }
 
 TEST_F(PeerConnectionFunctionalityTest, iceRestartTestForcedTurn)
@@ -639,23 +639,23 @@ TEST_F(PeerConnectionFunctionalityTest, iceRestartTestForcedTurn)
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    EXPECT_EQ(restartIce(offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_restartIce(offerPc), STATUS_SUCCESS);
 
     /* reset state change count */
     MEMSET(&stateChangeCount, 0x00, SIZEOF(stateChangeCount));
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
-    closePeerConnection(answerPc);
+    pc_close(offerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -674,17 +674,17 @@ TEST_F(PeerConnectionFunctionalityTest, peerConnectionOfferCloseConnection)
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(offerPc);
+    pc_close(offerPc);
     EXPECT_EQ(ATOMIC_LOAD(&stateChangeCount[RTC_PEER_CONNECTION_STATE_CLOSED]), 2);
-    closePeerConnection(answerPc);
+    pc_close(answerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -703,17 +703,17 @@ TEST_F(PeerConnectionFunctionalityTest, peerConnectionAnswerCloseConnection)
     initializeSignalingClient();
     getIceServers(&configuration);
 
-    EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-    EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+    EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
     EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
 
-    closePeerConnection(answerPc);
+    pc_close(answerPc);
     EXPECT_EQ(stateChangeCount[RTC_PEER_CONNECTION_STATE_CLOSED], 2);
-    closePeerConnection(offerPc);
+    pc_close(offerPc);
 
-    freePeerConnection(&offerPc);
-    freePeerConnection(&answerPc);
+    pc_free(&offerPc);
+    pc_free(&answerPc);
 
     deinitializeSignalingClient();
 }
@@ -746,8 +746,8 @@ TEST_F(PeerConnectionFunctionalityTest, DISABLED_exchangeMediaThroughTurnRandomS
             configuration.iceTransportPolicy = ICE_TRANSPORT_POLICY_RELAY;
             getIceServers(&configuration);
 
-            EXPECT_EQ(createPeerConnection(&configuration, &offerPc), STATUS_SUCCESS);
-            EXPECT_EQ(createPeerConnection(&configuration, &answerPc), STATUS_SUCCESS);
+            EXPECT_EQ(pc_create(&configuration, &offerPc), STATUS_SUCCESS);
+            EXPECT_EQ(pc_create(&configuration, &answerPc), STATUS_SUCCESS);
 
             addTrackToPeerConnection(offerPc, &offerVideoTrack, &offerVideoTransceiver, RTC_CODEC_VP8, MEDIA_STREAM_TRACK_KIND_VIDEO);
             addTrackToPeerConnection(offerPc, &offerAudioTrack, &offerAudioTransceiver, RTC_CODEC_OPUS, MEDIA_STREAM_TRACK_KIND_AUDIO);
@@ -758,8 +758,8 @@ TEST_F(PeerConnectionFunctionalityTest, DISABLED_exchangeMediaThroughTurnRandomS
                 UNUSED_PARAM(pFrame);
                 ATOMIC_STORE_BOOL((PSIZE_T) customData, TRUE);
             };
-            EXPECT_EQ(transceiverOnFrame(offerVideoTransceiver, (UINT64) &offerSeenVideo, onFrameHandler), STATUS_SUCCESS);
-            EXPECT_EQ(transceiverOnFrame(answerVideoTransceiver, (UINT64) &answerSeenVideo, onFrameHandler), STATUS_SUCCESS);
+            EXPECT_EQ(rtp_transceiver_onFrame(offerVideoTransceiver, (UINT64) &offerSeenVideo, onFrameHandler), STATUS_SUCCESS);
+            EXPECT_EQ(rtp_transceiver_onFrame(answerVideoTransceiver, (UINT64) &answerSeenVideo, onFrameHandler), STATUS_SUCCESS);
 
             MEMSET(stateChangeCount, 0x00, SIZEOF(stateChangeCount));
             EXPECT_EQ(connectTwoPeers(offerPc, answerPc), TRUE);
@@ -769,7 +769,7 @@ TEST_F(PeerConnectionFunctionalityTest, DISABLED_exchangeMediaThroughTurnRandomS
 
             auto sendVideoWorker = [](PRtcRtpTransceiver pRtcRtpTransceiver, Frame frame, PSIZE_T pTerminationFlag) -> void {
                 while (!ATOMIC_LOAD_BOOL(pTerminationFlag)) {
-                    EXPECT_EQ(writeFrame(pRtcRtpTransceiver, &frame), STATUS_SUCCESS);
+                    EXPECT_EQ(rtp_writeFrame(pRtcRtpTransceiver, &frame), STATUS_SUCCESS);
                     // frame was copied by value
                     frame.presentationTs += (HUNDREDS_OF_NANOS_IN_A_SECOND / 25);
 
@@ -784,11 +784,11 @@ TEST_F(PeerConnectionFunctionalityTest, DISABLED_exchangeMediaThroughTurnRandomS
 
             ATOMIC_STORE_BOOL(&offerStopVideo, TRUE);
             offerSendVideoWorker.join();
-            freePeerConnection(&offerPc);
+            pc_free(&offerPc);
 
             ATOMIC_STORE_BOOL(&answerStopVideo, TRUE);
             answerSendVideoWorker.join();
-            freePeerConnection(&answerPc);
+            pc_free(&answerPc);
 
             if (expectSeenVideo) {
                 EXPECT_EQ(ATOMIC_LOAD_BOOL(&offerSeenVideo), TRUE);

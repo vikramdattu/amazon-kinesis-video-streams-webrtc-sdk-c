@@ -18,15 +18,92 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/******************************************************************************
+ * HEADERS
+ ******************************************************************************/
+#include "kvs/error.h"
+#include "kvs/common_defs.h"
+/******************************************************************************
+ * DEFINITIONS
+ ******************************************************************************/
+/******************************************************************************
+ * FUNCTIONS
+ ******************************************************************************/
 /**
- * File I/O functionality
+ * @brief Read a file from the given full/relative filePath into the memory area pointed to by pBuffer.
+ * Specifying NULL in pBuffer will return the size of the file.
+ *
+ * @param[in] filePath file path to read from
+ * @param[in] binMode TRUE to read file stream as binary; FALSE to read as a normal text file
+ * @param[in] pBuffer buffer to write contents of the file to. If NULL return the size in pSize.
+ * @param[in] pSize destination PUINT64 to store the size of the file when pBuffer is NULL;
+ *
+ * @return STATUS code of the execution.
  */
-STATUS readFile(PCHAR filePath, BOOL binMode, PBYTE pBuffer, PUINT64 pSize);
-STATUS readFileSegment(PCHAR filePath, BOOL binMode, PBYTE pBuffer, UINT64 offset, UINT64 readSize);
-STATUS writeFile(PCHAR filePath, BOOL binMode, BOOL append, PBYTE pBuffer, UINT64 size);
-STATUS getFileLength(PCHAR filePath, PUINT64 pSize);
-STATUS fileExists(PCHAR filePath, PBOOL pExists);
-STATUS createFile(PCHAR filePath, UINT64 size);
+STATUS fileio_read(PCHAR filePath, BOOL binMode, PBYTE pBuffer, PUINT64 pSize);
+/**
+ * @brief Read a section of the file from the given full/relative filePath into the memory area pointed to by pBuffer.
+ * NOTE: The buffer should be large enough to read the section.
+ *
+ * @param[in] filePath file path to read from
+ * @param[in] binMode TRUE to read file stream as binary; FALSE to read as a normal text file
+ * @param[in] pBuffer buffer to write contents of the file to. Non-null
+ * @param[in] offset Offset into the file to start reading from.
+ * @param[in] readSize The number of bytes to read from the file.
+ *
+ * @return STATUS code of the execution.
+ */
+STATUS fileio_readSegment(PCHAR filePath, BOOL binMode, PBYTE pBuffer, UINT64 offset, UINT64 readSize);
+/**
+ * @brief
+ *
+ * @param[in]
+ * @param[in]
+ * @param[in]
+ * @param[in]
+ *
+ * @return STATUS code of the execution.
+ */
+/**
+ * Write contents pointed to by pBuffer to the given filePath.
+ *
+ * Parameters:
+ *     filePath - file path to write to
+ *     binMode  - TRUE to read file stream as binary; FALSE to read as a normal text file
+ *     append   - TRUE to append; FALSE to overwrite
+ *     pBuffer  - memory location whose contents should be written to the file
+ *     size     - number of bytes that should be written to the file
+ */
+STATUS fileio_write(PCHAR filePath, BOOL binMode, BOOL append, PBYTE pBuffer, UINT64 size);
+/**
+ * @brief Gets the file length of the given filePath.
+ *
+ * @param[in] filePath - file path whose file length should be computed
+ * @param[in] pLength  - Returns the size of the file in bytes
+ * @param[in]
+ * @param[in]
+ *
+ * @return STATUS code of the execution.
+ */
+STATUS fileio_getLength(PCHAR filePath, PUINT64 pSize);
+/**
+ * @brief Checks if the file or directory exists with a given full or relative path
+ *
+ * @param[in] filePath - file path to check
+ * @param[in] pExists - TRUE if the file exists
+ *
+ * @return STATUS code of the execution.
+ */
+STATUS fileio_isExisted(PCHAR filePath, PBOOL pExists);
+/**
+ * @brief Creates/overwrites a new file with a given size
+ *
+ * @param[in] filePath - file path to check
+ * @param[in] size - The size of the newly created file
+ *
+ * @return STATUS code of the execution.
+ */
+STATUS fileio_create(PCHAR filePath, UINT64 size);
 
 #ifdef __cplusplus
 }

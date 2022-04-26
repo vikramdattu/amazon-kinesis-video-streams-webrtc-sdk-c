@@ -13,21 +13,17 @@ extern "C" {
 ////////////////////////////////////////////////////
 // Project include files
 ////////////////////////////////////////////////////
-#include <kvs/WebRTCClient.h>
+#include <kvs/webrtc_client.h>
 
 // INET/INET6 MUST be defined before usrsctp
 // If removed will cause corruption that is hard to determine at runtime
-#define INET  1
-#define INET6 1
-
-#define IS_IPV4_ADDR(pAddress) ((pAddress)->family == KVS_IP_FAMILY_TYPE_IPV4)
+#define INET 1
+//#define INET6 1
 
 ////////////////////////////////////////////////////
 // Project forward declarations
 ////////////////////////////////////////////////////
 struct __TurnConnection;
-
-#define KVS_CONVERT_TIMESCALE(pts, from_timescale, to_timescale) (pts * to_timescale / from_timescale)
 
 #ifdef __cplusplus
 }
