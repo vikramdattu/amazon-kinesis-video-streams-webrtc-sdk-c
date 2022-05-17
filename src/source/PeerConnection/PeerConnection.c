@@ -936,7 +936,7 @@ STATUS pc_free(PRtcPeerConnection* ppPeerConnection)
     CHK_LOG_ERR(dtls_session_free(&pKvsPeerConnection->pDtlsSession));
 
 #ifdef ENABLE_STREAMING
-    CHK_LOG_ERR(doubleListFree(pKvsPeerConnection->pTransceivers));
+    CHK_LOG_ERR(double_list_free(pKvsPeerConnection->pTransceivers));
     CHK_LOG_ERR(hash_table_free(pKvsPeerConnection->pCodecTable));
     CHK_LOG_ERR(hash_table_free(pKvsPeerConnection->pRtxTable));
     if (IS_VALID_MUTEX_VALUE(pKvsPeerConnection->pSrtpSessionLock)) {

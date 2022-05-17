@@ -76,32 +76,57 @@ STATUS fileio_readSegment(PCHAR filePath, BOOL binMode, PBYTE pBuffer, UINT64 of
  */
 STATUS fileio_write(PCHAR filePath, BOOL binMode, BOOL append, PBYTE pBuffer, UINT64 size);
 /**
- * @brief Gets the file length of the given filePath.
+ * @brief
  *
- * @param[in] filePath - file path whose file length should be computed
- * @param[in] pLength  - Returns the size of the file in bytes
+ * @param[in]
+ * @param[in]
  * @param[in]
  * @param[in]
  *
  * @return STATUS code of the execution.
+/**
+ * Gets the file length of the given filePath.
+ *
+ * Parameters:
+ *     filePath - file path whose file length should be computed
+ *     pLength  - Returns the size of the file in bytes
+ *
+ * Returns:
+ *     STATUS of the operation
  */
 STATUS fileio_getLength(PCHAR filePath, PUINT64 pSize);
 /**
- * @brief Checks if the file or directory exists with a given full or relative path
+ * @brief
  *
- * @param[in] filePath - file path to check
- * @param[in] pExists - TRUE if the file exists
+ * @param[in]
+ * @param[in]
+ * @param[in]
+ * @param[in]
  *
  * @return STATUS code of the execution.
+/**
+ * Checks if the file or directory exists with a given full or relative path
+ *
+ * Parameters:
+ *      filePath - file path to check
+ *      pExists - TRUE if the file exists
  */
 STATUS fileio_isExisted(PCHAR filePath, PBOOL pExists);
 /**
- * @brief Creates/overwrites a new file with a given size
+ * @brief
  *
- * @param[in] filePath - file path to check
- * @param[in] size - The size of the newly created file
+ * @param[in]
+ * @param[in]
+ * @param[in]
+ * @param[in]
  *
  * @return STATUS code of the execution.
+/**
+ * Creates/overwrites a new file with a given size
+ *
+ * Parameters:
+ *      filePath - file path to check
+ *      size - The size of the newly created file
  */
 STATUS fileio_create(PCHAR filePath, UINT64 size);
 
