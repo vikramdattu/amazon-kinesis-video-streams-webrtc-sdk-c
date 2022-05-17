@@ -84,7 +84,7 @@ STATUS fileio_write(PCHAR filePath, BOOL binMode, BOOL append, PBYTE pBuffer, UI
  * @param[in]
  *
  * @return STATUS code of the execution.
-/**
+ *
  * Gets the file length of the given filePath.
  *
  * Parameters:
@@ -104,7 +104,7 @@ STATUS fileio_getLength(PCHAR filePath, PUINT64 pSize);
  * @param[in]
  *
  * @return STATUS code of the execution.
-/**
+ *
  * Checks if the file or directory exists with a given full or relative path
  *
  * Parameters:
@@ -121,7 +121,7 @@ STATUS fileio_isExisted(PCHAR filePath, PBOOL pExists);
  * @param[in]
  *
  * @return STATUS code of the execution.
-/**
+ *
  * Creates/overwrites a new file with a given size
  *
  * Parameters:
