@@ -302,12 +302,13 @@ STATUS signaling_create(PSignalingClientInfoInternal pClientInfo, PChannelInfo p
 
     pSignalingClient->wssContextLock = MUTEX_CREATE(TRUE);
     CHK(IS_VALID_MUTEX_VALUE(pSignalingClient->wssContextLock), STATUS_INVALID_OPERATION);
+    pSignalingClient->pWssContext = NULL;
 
     // Create the ongoing message list
     CHK_STATUS(stack_queue_create(&pSignalingClient->pOutboundMsgQ));
 
     // Initializing the diagnostics mostly is taken care of by zero-mem in MEMCALLOC
-    pSignalingClient->diagnostics.createTime = GETTIME();
+    pSignalingClient->diagnostics.createTime = SIGNALING_GET_CURRENT_TIME(pSignalingClient);
 
     // At this point we have constructed the main object and we can assign to the returned pointer
     *ppSignalingClient = pSignalingClient;
@@ -1044,9 +1045,6 @@ STATUS signaling_channel_describe(PSignalingClient pSignalingClient, UINT64 time
 
 CleanUp:
 
-    if (STATUS_FAILED(retStatus) && pSignalingClient != NULL) {
-        ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_UNKNOWN);
-    }
     LEAVES();
     return retStatus;
 }
@@ -1302,6 +1300,7 @@ STATUS signaling_channel_connect(PSignalingClient pSignalingClient, UINT64 time)
     if (STATUS_SUCCEEDED(retStatus)) {
         // No need to reconnect again if already connected. This can happen if we get to this state after ice refresh
         if (!ATOMIC_LOAD_BOOL(&pSignalingClient->connected)) {
+            DLOGI("Start connecting to the signaling server");
             ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_NONE);
             retStatus = wss_api_connect(pSignalingClient, &httpStatusCode);
             ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) httpStatusCode);
@@ -1312,6 +1311,7 @@ STATUS signaling_channel_connect(PSignalingClient pSignalingClient, UINT64 time)
                 pSignalingClient->apiCallHistory.connectTime = time;
             }
         } else {
+            DLOGI("Already connected with signaling server");
             ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_OK);
         }
     }
@@ -1321,6 +1321,7 @@ STATUS signaling_channel_connect(PSignalingClient pSignalingClient, UINT64 time)
     }
 
 CleanUp:
+    CHK_LOG_ERR(retStatus);
     LEAVES();
     return retStatus;
 }
@@ -1329,7 +1330,9 @@ STATUS signaling_getMetrics(PSignalingClient pSignalingClient, PSignalingClientM
 {
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
-    UINT64 curTime = GETTIME();
+    UINT64 curTime;
+
+    curTime = SIGNALING_GET_CURRENT_TIME(pSignalingClient);
 
     CHK(pSignalingClient != NULL && pSignalingClientMetrics != NULL, STATUS_SIGNALING_NULL_ARG);
     CHK(pSignalingClientMetrics->version <= SIGNALING_CLIENT_METRICS_CURRENT_VERSION, STATUS_SIGNALING_INVALID_METRICS_VERSION);
