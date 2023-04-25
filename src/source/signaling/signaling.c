@@ -144,7 +144,8 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_UNKNOWN);
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
-                    CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+                    CHK_STATUS(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT,
+                                                  SIGNALING_STATE_CONNECTED));
                     CHK(FALSE, retStatus);
                     break;
 
@@ -153,7 +154,8 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_SIGNALING_GO_AWAY);
-                    CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+                    CHK_STATUS(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT,
+                                                  SIGNALING_STATE_CONNECTED));
                     CHK(FALSE, retStatus);
                     break;
 
@@ -162,7 +164,8 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_SIGNALING_RECONNECT_ICE);
-                    CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+                    CHK_STATUS(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT,
+                                                  SIGNALING_STATE_CONNECTED));
                     CHK(FALSE, retStatus);
                     break;
                 case SIGNALING_MESSAGE_TYPE_CTRL_CLOSE:
@@ -170,7 +173,8 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_UNKNOWN);
-                    CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+                    CHK_STATUS(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT,
+                                                  SIGNALING_STATE_CONNECTED));
                     // #TBD
                     ATOMIC_INCREMENT(&pSignalingClient->diagnostics.numberOfReconnects);
                     CHK(FALSE, retStatus);
@@ -188,7 +192,7 @@ static PVOID signaling_handleMsg(PVOID pArgs)
 
     DLOGD("The thread of handling msg is down");
     THREAD_EXIT(NULL);
-    return (PVOID)(ULONG_PTR) retStatus;
+    return (PVOID) (ULONG_PTR) retStatus;
 }
 
 static STATUS signaling_dispatchMsg(PVOID pMessage)
@@ -282,7 +286,6 @@ STATUS signaling_create(PSignalingClientInfoInternal pClientInfo, PChannelInfo p
 
     ATOMIC_STORE_BOOL(&pSignalingClient->shutdown, FALSE);
     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
-    pSignalingClient->connecting = FALSE;
     pSignalingClient->reconnect = pChannelInfo->reconnect;
     // Do not force ice config state
     ATOMIC_STORE_BOOL(&pSignalingClient->refreshIceConfig, FALSE);
@@ -309,9 +312,6 @@ STATUS signaling_create(PSignalingClientInfoInternal pClientInfo, PChannelInfo p
     // At this point we have constructed the main object and we can assign to the returned pointer
     *ppSignalingClient = pSignalingClient;
 
-    // Set the time out before execution
-    pSignalingClient->stepUntil = pSignalingClient->diagnostics.createTime + SIGNALING_CREATE_TIMEOUT;
-
     // Notify of the state change initially as the state machinery is already in the NEW state
     if (pSignalingClient->signalingClientCallbacks.stateChangeFn != NULL) {
         CHK_STATUS(pSignalingClient->signalingClientCallbacks.stateChangeFn(pSignalingClient->signalingClientCallbacks.customData,
@@ -320,7 +320,8 @@ STATUS signaling_create(PSignalingClientInfoInternal pClientInfo, PChannelInfo p
 
     // Prime the state machine
     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_NONE);
-    CHK_STATUS(signaling_fsm_step(pSignalingClient, STATUS_SUCCESS));
+    CHK_STATUS(
+        signaling_fsm_step(pSignalingClient, pSignalingClient->diagnostics.createTime + SIGNALING_CONNECT_STATE_TIMEOUT, SIGNALING_STATE_GET_TOKEN));
 
 CleanUp:
 
@@ -461,11 +462,12 @@ STATUS signaling_send(PSignalingClient pSignalingClient, PSignalingMessage pSign
 
     // Prepare json message
     if (correlationLen == 0) {
-        writtenSize = (UINT32) SNPRINTF((PCHAR)(pSendBuffer), size, WSS_MESSAGE_TEMPLATE, pOfferType, MAX_SIGNALING_CLIENT_ID_LEN,
+        writtenSize = (UINT32) SNPRINTF((PCHAR) (pSendBuffer), size, WSS_MESSAGE_TEMPLATE, pOfferType, MAX_SIGNALING_CLIENT_ID_LEN,
                                         pSignalingMessage->peerClientId, pEncodedMessage);
     } else {
-        writtenSize = (UINT32) SNPRINTF((PCHAR)(pSendBuffer), size, WSS_MESSAGE_TEMPLATE_WITH_CORRELATION_ID, pOfferType, MAX_SIGNALING_CLIENT_ID_LEN,
-                                        pSignalingMessage->peerClientId, pEncodedMessage, correlationLen, pSignalingMessage->correlationId);
+        writtenSize =
+            (UINT32) SNPRINTF((PCHAR) (pSendBuffer), size, WSS_MESSAGE_TEMPLATE_WITH_CORRELATION_ID, pOfferType, MAX_SIGNALING_CLIENT_ID_LEN,
+                              pSignalingMessage->peerClientId, pEncodedMessage, correlationLen, pSignalingMessage->correlationId);
     }
 
     // Validate against max
@@ -585,6 +587,33 @@ CleanUp:
     return retStatus;
 }
 
+STATUS signaling_fetch(PSignalingClient pSignalingClient)
+{
+    ENTERS();
+    STATUS retStatus = STATUS_SUCCESS;
+
+    CHK(pSignalingClient != NULL, STATUS_NULL_ARG);
+
+    // Check if we are already not connected
+    if (ATOMIC_LOAD_BOOL(&pSignalingClient->connected)) {
+        wss_api_disconnect(pSignalingClient);
+        ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
+        ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_OK);
+    }
+
+    CHK_STATUS(
+        signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT, SIGNALING_STATE_READY));
+
+CleanUp:
+
+    if (STATUS_FAILED(retStatus)) {
+        signaling_fsm_resetRetryCount(pSignalingClient);
+    }
+    CHK_LOG_ERR(retStatus);
+    LEAVES();
+    return retStatus;
+}
+
 STATUS signaling_connect(PSignalingClient pSignalingClient)
 {
     ENTERS();
@@ -602,15 +631,12 @@ STATUS signaling_connect(PSignalingClient pSignalingClient)
     // Check if we are already connected
     CHK(!ATOMIC_LOAD_BOOL(&pSignalingClient->connected), retStatus);
 
-    // Self-prime through the ready state
-    pSignalingClient->connecting = TRUE;
-
     // Store the signaling state in case we error/timeout so we can re-set it on exit
     state = signaling_fsm_getCurrentState(pSignalingClient);
-    // Set the time out before execution
-    pSignalingClient->stepUntil = GETTIME() + SIGNALING_CONNECT_STATE_TIMEOUT;
 
-    CHK(signaling_fsm_step(pSignalingClient, retStatus) == STATUS_SUCCESS, STATUS_SIGNALING_FSM_STEP_FAILED);
+    CHK(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_CONNECT_STATE_TIMEOUT,
+                           SIGNALING_STATE_CONNECTED) == STATUS_SUCCESS,
+        STATUS_SIGNALING_FSM_STEP_FAILED);
 
 CleanUp:
 
@@ -633,19 +659,16 @@ STATUS signaling_disconnect(PSignalingClient pSignalingClient)
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
 
-    // Do not self-prime through the ready state
-    pSignalingClient->connecting = FALSE;
-
     // Check if we are already not connected
     CHK(ATOMIC_LOAD_BOOL(&pSignalingClient->connected), retStatus);
-
     wss_api_disconnect(pSignalingClient);
     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_OK);
 
     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_OK);
 
-    CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+    CHK_STATUS(signaling_fsm_step(pSignalingClient, SIGNALING_GET_CURRENT_TIME(pSignalingClient) + SIGNALING_DISCONNECT_STATE_TIMEOUT,
+                                  SIGNALING_STATE_READY));
 
 CleanUp:
 
@@ -748,7 +771,7 @@ STATUS signaling_validateIceConfiguration(PSignalingClient pSignalingClient)
 
     CHK(minTtl > ICE_CONFIGURATION_REFRESH_GRACE_PERIOD, STATUS_SIGNALING_ICE_TTL_LESS_THAN_GRACE_PERIOD);
 
-    pSignalingClient->iceConfigTime = GETTIME();
+    pSignalingClient->iceConfigTime = SIGNALING_GET_CURRENT_TIME(pSignalingClient);
     pSignalingClient->iceConfigExpiration = pSignalingClient->iceConfigTime + (minTtl - ICE_CONFIGURATION_REFRESH_GRACE_PERIOD);
     DLOGD("The expiration of ice config: %" PRIu64 ", ttl: %" PRIu64, pSignalingClient->iceConfigExpiration, minTtl / HUNDREDS_OF_NANOS_IN_A_SECOND);
 
@@ -773,7 +796,7 @@ STATUS signaling_refreshIceConfiguration(PSignalingClient pSignalingClient)
 
     DLOGD("Refreshing the ICE Server Configuration");
     // Check whether we have a valid not-yet-expired ICE configuration and if so early exit
-    curTime = GETTIME();
+    curTime = SIGNALING_GET_CURRENT_TIME(pSignalingClient);
     CHK(pSignalingClient->iceConfigCount == 0 || curTime > pSignalingClient->iceConfigExpiration, retStatus);
 
     CHK(signaling_fsm_accept(pSignalingClient,
@@ -794,10 +817,7 @@ STATUS signaling_refreshIceConfiguration(PSignalingClient pSignalingClient)
 
     // Iterate the state machinery in steady states only - ready or connected
     if (state == SIGNALING_STATE_READY || state == SIGNALING_STATE_CONNECTED) {
-        // Set the time out before execution
-        pSignalingClient->stepUntil = GETTIME() + SIGNALING_REFRESH_ICE_CONFIG_STATE_TIMEOUT;
-
-        CHK_STATUS(signaling_fsm_step(pSignalingClient, retStatus));
+        CHK_STATUS(signaling_fsm_step(pSignalingClient, curTime + SIGNALING_REFRESH_ICE_CONFIG_STATE_TIMEOUT, state));
     }
 
 CleanUp:
@@ -1036,6 +1056,7 @@ STATUS signaling_channel_create(PSignalingClient pSignalingClient, UINT64 time)
     ENTERS();
     STATUS retStatus = STATUS_SUCCESS;
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
+
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
 
     // Check for the stale credentials

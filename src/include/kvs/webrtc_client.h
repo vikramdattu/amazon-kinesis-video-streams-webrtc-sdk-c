@@ -260,6 +260,11 @@ extern "C" {
 #define SIGNALING_CONNECT_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
 /**
+ * Default disconnect sync API timeout
+ */
+#define SIGNALING_DISCONNECT_STATE_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+
+/**
  * Default timeout for sending data
  */
 #define SIGNALING_SEND_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
@@ -1064,6 +1069,7 @@ typedef struct {
     SignalingClientMessageReceivedFunc messageReceivedFn; //!< Callback registeration for received SDP
     SignalingClientErrorReportFunc errorReportFn;         //!<  Error reporting function. This is an optional member
     SignalingClientStateChangedFunc stateChangeFn;        //!< Signaling client state change callback
+    GetCurrentTimeFunc getCurrentTimeFn;                  //!< callback to override system time, used for testing clock skew
 } SignalingClientCallbacks, *PSignalingClientCallbacks;
 
 /**
@@ -1625,6 +1631,25 @@ PUBLIC_API STATUS signaling_client_getIceConfigInfoCount(SIGNALING_CLIENT_HANDLE
  * @return STATUS code of execution. STATUS_SUCCESS on success
  */
 PUBLIC_API STATUS signaling_client_getIceConfigInfo(SIGNALING_CLIENT_HANDLE, UINT32, PIceConfigInfo*);
+
+/**
+ * @brief Shutdown signaling client.
+ *
+ * @param[in] SIGNALING_CLIENT_HANDLE Signaling client handle
+ *
+ * @return STATUS code of the execution. STATUS_SUCCESS on successs
+ */
+PUBLIC_API STATUS signaling_client_shutdown(SIGNALING_CLIENT_HANDLE);
+
+/**
+ * @brief Fetches all assets needed to ready the state machine before attempting to connect.
+ *        Can also be used to reallocate missing / expired assets before reconnecting.
+ *
+ * @param[in] SIGNALING_CLIENT_HANDLE Signaling client handle
+ *
+ * @return STATUS code of the execution. STATUS_SUCCESS on successs
+ */
+PUBLIC_API STATUS signaling_client_fetch(SIGNALING_CLIENT_HANDLE);
 
 /**
  * @brief Connects the signaling client to the web socket in order to send/receive messages.
