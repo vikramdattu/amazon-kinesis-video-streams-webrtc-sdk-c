@@ -31,16 +31,16 @@ extern "C" {
  * Signaling states definitions
  */
 #define SIGNALING_STATE_NONE           ((UINT64) 0)
-#define SIGNALING_STATE_NEW            ((UINT64)(1 << 0))
-#define SIGNALING_STATE_GET_TOKEN      ((UINT64)(1 << 1))
-#define SIGNALING_STATE_DESCRIBE       ((UINT64)(1 << 2))
-#define SIGNALING_STATE_CREATE         ((UINT64)(1 << 3))
-#define SIGNALING_STATE_GET_ENDPOINT   ((UINT64)(1 << 4))
-#define SIGNALING_STATE_GET_ICE_CONFIG ((UINT64)(1 << 5))
-#define SIGNALING_STATE_READY          ((UINT64)(1 << 6))
-#define SIGNALING_STATE_CONNECT        ((UINT64)(1 << 7))
-#define SIGNALING_STATE_CONNECTED      ((UINT64)(1 << 8))
-#define SIGNALING_STATE_DISCONNECTED   ((UINT64)(1 << 9))
+#define SIGNALING_STATE_NEW            ((UINT64) (1 << 0))
+#define SIGNALING_STATE_GET_TOKEN      ((UINT64) (1 << 1))
+#define SIGNALING_STATE_DESCRIBE       ((UINT64) (1 << 2))
+#define SIGNALING_STATE_CREATE         ((UINT64) (1 << 3))
+#define SIGNALING_STATE_GET_ENDPOINT   ((UINT64) (1 << 4))
+#define SIGNALING_STATE_GET_ICE_CONFIG ((UINT64) (1 << 5))
+#define SIGNALING_STATE_READY          ((UINT64) (1 << 6))
+#define SIGNALING_STATE_CONNECT        ((UINT64) (1 << 7))
+#define SIGNALING_STATE_CONNECTED      ((UINT64) (1 << 8))
+#define SIGNALING_STATE_DISCONNECTED   ((UINT64) (1 << 9))
 
 typedef PVOID SignalingFsmHandle;
 typedef SignalingFsmHandle* PSignalingFsmHandle;
@@ -69,11 +69,12 @@ STATUS signaling_fsm_free(SignalingFsmHandle signalingFsmHandle);
  * @brief step the state machine
  *
  * @param[in] pSignalingClient the context of the signaling client.
- * @param[in] status
+ * @param[in] expiration timeout
+ * @param[in] finalState final signaling client state
  *
  * @return STATUS status of execution.
  */
-STATUS signaling_fsm_step(PSignalingClient pSignalingClient, STATUS status);
+STATUS signaling_fsm_step(PSignalingClient pSignalingClient, UINT64 expiration, UINT64 finalState);
 /**
  * @brief check the current state is the required state or not.
  *
