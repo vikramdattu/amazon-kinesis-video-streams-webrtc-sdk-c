@@ -122,6 +122,7 @@ static INT32 wss_client_socketSend(PWssClientContext pWssClientCtx, const UINT8*
     UNUSED_PARAM(flags);
     int res = NetIo_send(pWssClientCtx->xNetIoHandle, data, len);
     if (res == STATUS_SUCCESS) {
+        DLOGV("wss_client_socketSend:%d", len);
         return len;
     } else {
         res = -1;
@@ -188,7 +189,7 @@ static VOID wslay_msg_recv_callback(wslay_event_context_ptr ctx, const struct ws
     } else {
         pWssClientCtx->ctrlMessageHandler(pWssClientCtx->pUserData, arg->opcode, arg->msg, arg->msg_length);
         if (arg->opcode == WSLAY_PONG) {
-            pWssClientCtx->pingCounter = 0;
+            ATOMIC_INCREMENT(&pWssClientCtx->pongCounter);
         }
     }
 }
@@ -300,7 +301,8 @@ VOID wss_client_create(PWssClientContext* ppWssClientCtx, NetIoHandle xNetIoHand
     pWssClientCtx->ioLock = MUTEX_CREATE(FALSE);
     CHK(IS_VALID_MUTEX_VALUE(pWssClientCtx->ioLock), STATUS_INVALID_OPERATION);
 
-    pWssClientCtx->pingCounter = 0;
+    ATOMIC_STORE(&pWssClientCtx->pingCounter, 0);
+    ATOMIC_STORE(&pWssClientCtx->pongCounter, 0);
 
     wslay_event_context_client_init(&pWssClientCtx->event_ctx, &pWssClientCtx->event_callbacks, pWssClientCtx);
     pWssClientCtx->clientTid = INVALID_TID_VALUE;
@@ -328,7 +330,8 @@ PVOID wss_client_routine(PWssClientContext pWssClientCtx)
 
     nfds = NetIo_getSocket(pWssClientCtx->xNetIoHandle);
     FD_ZERO(&rfds);
-
+    UINT64 startTime = GETTIME() - WSS_CLIENT_PING_PONG_INTERVAL;
+    UINT64 endTime = startTime;
     // check the wss client want to read or write or not.
     // When the wss lib receive the ctrl frame of close connection, this flag of read_enabled will be pull down.
     // It means we do not need to handle this loop when the connection is closed.
@@ -352,10 +355,12 @@ PVOID wss_client_routine(PWssClientContext pWssClientCtx)
         }
 
         // for ping-pong
-        pWssClientCtx->pingCounter++;
-        if (pWssClientCtx->pingCounter >= WSS_CLIENT_PING_PONG_COUNTER) {
+        endTime = GETTIME();
+        if (endTime - startTime >= WSS_CLIENT_PING_PONG_INTERVAL) {
             CHK(wss_client_sendPing(pWssClientCtx) == STATUS_SUCCESS, STATUS_WSS_CLIENT_PING_FAILED);
-            pWssClientCtx->pingCounter = 0;
+            startTime = endTime;
+            ATOMIC_INCREMENT(&pWssClientCtx->pingCounter);
+            DLOGD("(ping, pong): (%d, %d)", ATOMIC_LOAD(&pWssClientCtx->pingCounter), ATOMIC_LOAD(&pWssClientCtx->pongCounter));
         }
     }
 

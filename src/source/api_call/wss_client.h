@@ -36,7 +36,7 @@ extern "C" {
 #define WSS_CLIENT_SHA1_RANDOM_SEED_W_UUID_LEN 20
 #define WSS_CLIENT_ACCEPT_KEY_LEN              28
 #define WSS_CLIENT_POLLING_INTERVAL            100 // unit:ms.
-#define WSS_CLIENT_PING_PONG_INTERVAL          10  // unit:sec.
+#define WSS_CLIENT_PING_PONG_INTERVAL          10 * HUNDREDS_OF_NANOS_IN_A_SECOND
 #define WSS_CLIENT_PING_PONG_COUNTER           (WSS_CLIENT_PING_PONG_INTERVAL * 1000) / WSS_CLIENT_POLLING_INTERVAL
 
 typedef STATUS (*MessageHandlerFunc)(PVOID pUserData, PCHAR pMessage, UINT32 messageLen);
@@ -46,7 +46,8 @@ typedef struct {
     wslay_event_context_ptr event_ctx;            //!< the event context of wslay.
     struct wslay_event_callbacks event_callbacks; //!< the callback of event context.
     NetIoHandle xNetIoHandle;
-    UINT64 pingCounter;
+    volatile SIZE_T pingCounter;
+    volatile SIZE_T pongCounter;
     MUTEX ioLock;                              //!< the lock for the control of the wss io.
     PVOID pUserData;                           //!< the arguments of the message handler. ref: PSignalingClient
     MessageHandlerFunc messageHandler;         //!< the handler of receive the non-ctrl messages.
