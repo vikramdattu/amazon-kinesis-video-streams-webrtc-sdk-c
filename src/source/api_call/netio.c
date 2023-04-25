@@ -251,7 +251,8 @@ int NetIo_send(NetIoHandle xNetIoHandle, const unsigned char* pBuffer, size_t uB
     char* pIndex = (char*) pBuffer;
 
     if (pxNet == NULL || pBuffer == NULL) {
-        xRes = STATUS_NULL_ARG;
+        xRes = -1;
+        DLOGE("NetIo_send null arg");
     } else {
         do {
             n = mbedtls_ssl_write(&(pxNet->xSsl), (const unsigned char*) pIndex, uBytesRemaining);
