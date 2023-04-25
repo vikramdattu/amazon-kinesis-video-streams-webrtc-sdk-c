@@ -135,6 +135,7 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     break;
 
                 case SIGNALING_MESSAGE_TYPE_STATUS_RESPONSE:
+                    DLOGI("The status response message received");
                     if (pMsg->receivedSignalingMessage.statusCode != HTTP_STATUS_OK) {
                         DLOGW("Failed to deliver message. Correlation ID: %s, Error Type: %s, Error Code: %u, Description: %s",
                               pMsg->receivedSignalingMessage.signalingMessage.correlationId, pMsg->receivedSignalingMessage.errorType,
@@ -150,7 +151,7 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     break;
 
                 case SIGNALING_MESSAGE_TYPE_GO_AWAY:
-                    DLOGD("Wss msg type:%d", pMsg->receivedSignalingMessage.signalingMessage.messageType);
+                    DLOGI("The go away message received");
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_SIGNALING_GO_AWAY);
@@ -160,7 +161,7 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     break;
 
                 case SIGNALING_MESSAGE_TYPE_RECONNECT_ICE_SERVER:
-                    DLOGD("Wss msg type:%d", pMsg->receivedSignalingMessage.signalingMessage.messageType);
+                    DLOGI("The reconnect ice server message received");
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_SIGNALING_RECONNECT_ICE);
@@ -169,7 +170,7 @@ static PVOID signaling_handleMsg(PVOID pArgs)
                     CHK(FALSE, retStatus);
                     break;
                 case SIGNALING_MESSAGE_TYPE_CTRL_CLOSE:
-                    DLOGD("Wss msg type:%d", pMsg->receivedSignalingMessage.signalingMessage.messageType);
+                    DLOGI("The ctrl close message received");
                     CHK_STATUS(wss_api_disconnect(pSignalingClient));
                     ATOMIC_STORE_BOOL(&pSignalingClient->connected, FALSE);
                     ATOMIC_STORE(&pSignalingClient->apiCallStatus, (SIZE_T) HTTP_STATUS_UNKNOWN);
@@ -991,7 +992,7 @@ STATUS signaling_channel_describe(PSignalingClient pSignalingClient, UINT64 time
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Describe the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1056,7 +1057,7 @@ STATUS signaling_channel_create(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Create the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1102,6 +1103,7 @@ STATUS signaling_channel_getEndpoint(PSignalingClient pSignalingClient, UINT64 t
     PSignalingFileCacheEntry psignalingFileCacheEntry = NULL;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
+    DLOGD("Get the signaling channel endpoints");
 
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
@@ -1190,7 +1192,7 @@ STATUS signaling_channel_getIceConfig(PSignalingClient pSignalingClient, UINT64 
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Get the ice configuration");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1235,6 +1237,7 @@ STATUS signaling_channel_delete(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
+    DLOGD("Delete the signaling channel");
     //#TBD
     // Check if we need to terminate the ongoing listener
     wss_api_disconnect(pSignalingClient);
@@ -1285,7 +1288,7 @@ STATUS signaling_channel_connect(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Connect to the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 

@@ -230,7 +230,7 @@ static STATUS turn_connection_handleInboundStunError(PTurnConnection pTurnConnec
     CHK(pTurnConnection != NULL, STATUS_TURN_NULL_ARG);
     CHK(pBuffer != NULL && bufferLen > 0, STATUS_TURN_INVALID_INBOUND_STUN_ERROR_BUF);
     CHK(STUN_PACKET_IS_TYPE_ERROR(pBuffer), retStatus);
-    DLOGD("stun error packet type:0x%x", STUN_PACKET_GET_TYPE(pBuffer));
+    DLOGE("stun error packet type:0x%x", STUN_PACKET_GET_TYPE(pBuffer));
 
     MUTEX_LOCK(pTurnConnection->lock);
     locked = TRUE;
@@ -259,6 +259,7 @@ static STATUS turn_connection_handleInboundStunError(PTurnConnection pTurnConnec
 
     switch (pStunAttributeErrorCode->errorCode) {
         case STUN_ERROR_UNAUTHORIZED:
+            DLOGE("Unauthorized");
             CHK_STATUS(stun_attribute_getByType(pStunPacket, STUN_ATTRIBUTE_TYPE_NONCE, &pStunAttr));
             CHK_WARN(pStunAttr != NULL, retStatus, "No Nonce attribute found in Allocate Error response. Dropping Packet");
             pStunAttributeNonce = (PStunAttributeNonce) pStunAttr;
@@ -284,7 +285,7 @@ static STATUS turn_connection_handleInboundStunError(PTurnConnection pTurnConnec
             break;
 
         case STUN_ERROR_STALE_NONCE:
-            DLOGD("Updating stale nonce");
+            DLOGE("Updating stale nonce");
             CHK_STATUS(stun_attribute_getByType(pStunPacket, STUN_ATTRIBUTE_TYPE_NONCE, &pStunAttr));
             CHK_WARN(pStunAttr != NULL, retStatus, "No Nonce attribute found in Refresh Error response. Dropping Packet");
             pStunAttributeNonce = (PStunAttributeNonce) pStunAttr;
@@ -304,7 +305,7 @@ static STATUS turn_connection_handleInboundStunError(PTurnConnection pTurnConnec
         case STUN_PACKET_TYPE_CHANNEL_BIND_ERROR_RESPONSE:
         default:
             /* Remove peer for any other error */
-            DLOGW("Received STUN error response. Error type: 0x%02x, Error Code: %u. attribute len %u, Error detail: %s.", stunPacketType,
+            DLOGE("Received STUN error response. Error type: 0x%02x, Error Code: %u. attribute len %u, Error detail: %s.", stunPacketType,
                   pStunAttributeErrorCode->errorCode, pStunAttributeErrorCode->attribute.length, pStunAttributeErrorCode->errorPhrase);
 
             /* Find TurnPeer using transaction Id, then mark it as failed */
@@ -382,7 +383,7 @@ static STATUS turn_connection_handleTcpChannelData(PTurnConnection pTurnConnecti
         if (pTurnConnection->currRecvDataLen != 0) {
             if (pTurnConnection->currRecvDataLen >= TURN_DATA_CHANNEL_SEND_OVERHEAD) {
                 /* pTurnConnection->recvDataBuffer always has channel data start */
-                paddedChannelDataLen = ROUND_UP((UINT32) getInt16(*(PINT16)(pTurnConnection->recvDataBuffer + SIZEOF(channelNumber))), 4);
+                paddedChannelDataLen = ROUND_UP((UINT32) getInt16(*(PINT16) (pTurnConnection->recvDataBuffer + SIZEOF(channelNumber))), 4);
                 remainingMsgSize = paddedChannelDataLen - (pTurnConnection->currRecvDataLen - TURN_DATA_CHANNEL_SEND_OVERHEAD);
                 bytesToCopy = MIN(remainingMsgSize, remainingBufLen);
                 remainingBufLen -= bytesToCopy;
@@ -427,7 +428,7 @@ static STATUS turn_connection_handleTcpChannelData(PTurnConnection pTurnConnecti
             /* new channel message start */
             CHK(*pCurPos == TURN_DATA_CHANNEL_MSG_FIRST_BYTE, STATUS_TURN_MISSING_CHANNEL_DATA_HEADER);
 
-            paddedChannelDataLen = ROUND_UP((UINT32) getInt16(*(PINT16)(pCurPos + SIZEOF(UINT16))), 4);
+            paddedChannelDataLen = ROUND_UP((UINT32) getInt16(*(PINT16) (pCurPos + SIZEOF(UINT16))), 4);
             if (remainingBufLen >= (paddedChannelDataLen + TURN_DATA_CHANNEL_SEND_OVERHEAD)) {
                 channelNumber = (UINT16) getInt16(*(PINT16) pCurPos);
                 if ((pTurnPeer = turn_connection_getPeerByChannelNum(pTurnConnection, channelNumber)) != NULL) {
@@ -975,7 +976,7 @@ STATUS turn_connection_create(PIceServer pTurnServer, TIMER_QUEUE_HANDLE timerQu
     // #TBD, #memory, #heap.
     pTurnConnection->recvDataBufferSize = DEFAULT_TURN_MESSAGE_RECV_CHANNEL_DATA_BUFFER_LEN;
     pTurnConnection->dataBufferSize = DEFAULT_TURN_MESSAGE_SEND_CHANNEL_DATA_BUFFER_LEN;
-    pTurnConnection->sendDataBuffer = (PBYTE)(pTurnConnection + 1);
+    pTurnConnection->sendDataBuffer = (PBYTE) (pTurnConnection + 1);
     pTurnConnection->recvDataBuffer = pTurnConnection->sendDataBuffer + pTurnConnection->dataBufferSize;
     pTurnConnection->completeChannelDataBuffer =
         pTurnConnection->sendDataBuffer + pTurnConnection->dataBufferSize + pTurnConnection->recvDataBufferSize;
@@ -1225,8 +1226,8 @@ STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pBuf, UINT32 
     paddedDataLen = (UINT32) ROUND_UP(TURN_DATA_CHANNEL_SEND_OVERHEAD + bufLen, 4);
 
     /* generate data channel TURN message */
-    putInt16((PINT16)(pTurnConnection->sendDataBuffer), pSendPeer->channelNumber);
-    putInt16((PINT16)(pTurnConnection->sendDataBuffer + 2), (UINT16) bufLen);
+    putInt16((PINT16) (pTurnConnection->sendDataBuffer), pSendPeer->channelNumber);
+    putInt16((PINT16) (pTurnConnection->sendDataBuffer + 2), (UINT16) bufLen);
     MEMCPY(pTurnConnection->sendDataBuffer + TURN_DATA_CHANNEL_SEND_OVERHEAD, pBuf, bufLen);
     // send the packet after re-mapping.
     retStatus = ice_utils_send(pTurnConnection->sendDataBuffer, paddedDataLen, &pTurnConnection->turnServer.ipAddress,
@@ -1537,7 +1538,7 @@ CleanUp:
     }
 
     if (pTurnConnection != NULL && previousState != pTurnConnection->turnFsmState) {
-        DLOGD("TurnConnection state changed from %s to %s", turn_connection_getStateStr(previousState),
+        DLOGI("TurnConnection state changed from %s to %s", turn_connection_getStateStr(previousState),
               turn_connection_getStateStr(pTurnConnection->turnFsmState));
     }
 
