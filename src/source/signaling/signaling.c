@@ -992,7 +992,7 @@ STATUS signaling_channel_describe(PSignalingClient pSignalingClient, UINT64 time
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Describe the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1057,7 +1057,7 @@ STATUS signaling_channel_create(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Create the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1103,6 +1103,7 @@ STATUS signaling_channel_getEndpoint(PSignalingClient pSignalingClient, UINT64 t
     PSignalingFileCacheEntry psignalingFileCacheEntry = NULL;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
+    DLOGD("Get the signaling channel endpoints");
 
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
@@ -1191,7 +1192,7 @@ STATUS signaling_channel_getIceConfig(PSignalingClient pSignalingClient, UINT64 
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Get the ice configuration");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
@@ -1236,6 +1237,7 @@ STATUS signaling_channel_delete(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
+    DLOGD("Delete the signaling channel");
     //#TBD
     // Check if we need to terminate the ongoing listener
     wss_api_disconnect(pSignalingClient);
@@ -1286,7 +1288,7 @@ STATUS signaling_channel_connect(PSignalingClient pSignalingClient, UINT64 time)
     UINT32 httpStatusCode = HTTP_STATUS_NONE;
 
     CHK(pSignalingClient != NULL, STATUS_SIGNALING_NULL_ARG);
-
+    DLOGD("Connect to the signaling channel");
     // Check for the stale credentials
     CHECK_SIGNALING_CREDENTIALS_EXPIRATION(pSignalingClient);
 
