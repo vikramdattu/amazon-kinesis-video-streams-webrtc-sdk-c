@@ -127,7 +127,7 @@ STATUS channel_info_create(PChannelInfo pOrigChannelInfo, PChannelInfo* ppChanne
     }
 
     // Set the current pointer to the end
-    pCurPtr = (PCHAR)(pChannelInfo + 1);
+    pCurPtr = (PCHAR) (pChannelInfo + 1);
 
     // Set the pointers to the end and copy the data.
     // NOTE: the structure is calloc-ed so the strings will be NULL terminated
@@ -153,6 +153,10 @@ STATUS channel_info_create(PChannelInfo pOrigChannelInfo, PChannelInfo* ppChanne
         // Create a fully qualified URI
         SNPRINTF(pCurPtr, cplLen, "%s%s.%s%s", CONTROL_PLANE_URI_PREFIX, KINESIS_VIDEO_SERVICE_NAME, pChannelInfo->pRegion,
                  CONTROL_PLANE_URI_POSTFIX);
+        // If region is in CN, add CN region uri postfix
+        if (STRSTR(pChannelInfo->pRegion, "cn-")) {
+            STRCAT(pCurPtr, ".cn");
+        }
     }
 
     pChannelInfo->pControlPlaneUrl = pCurPtr;
