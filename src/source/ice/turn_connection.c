@@ -1185,7 +1185,7 @@ STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pBuf, UINT32 
     // check the status of turn connection.
     if (!(pTurnConnection->turnFsmState == TURN_STATE_CREATE_PERMISSION || pTurnConnection->turnFsmState == TURN_STATE_BIND_CHANNEL ||
           pTurnConnection->turnFsmState == TURN_STATE_READY)) {
-        DLOGV("TurnConnection not ready to send data");
+        DLOGE("TurnConnection not ready to send data");
 
         // If turn is not ready yet. Drop the send since ice will retry.
         CHK(FALSE, retStatus);
@@ -1196,12 +1196,13 @@ STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pBuf, UINT32 
     CHK_STATUS(net_getIpAddrStr(pDestIp, ipAddrStr, ARRAY_SIZE(ipAddrStr)));
 
     if (pSendPeer == NULL) {
-        DLOGV("Unable to send data through turn because peer with address %s:%u is not found", ipAddrStr, KVS_GET_IP_ADDRESS_PORT(pDestIp));
+        DLOGE("Unable to send data through turn because peer with address %s:%u is not found", ipAddrStr, KVS_GET_IP_ADDRESS_PORT(pDestIp));
         CHK(FALSE, retStatus);
     } else if (pSendPeer->connectionState == TURN_PEER_CONN_STATE_FAILED) {
+        DLOGE("Turn peer connection state failed");
         CHK(FALSE, STATUS_TURN_PEER_NOT_USABLE);
     } else if (!pSendPeer->ready) {
-        DLOGV("Unable to send data through turn because turn channel is not established with peer with address %s:%u", ipAddrStr,
+        DLOGE("Unable to send data through turn because turn channel is not established with peer with address %s:%u", ipAddrStr,
               KVS_GET_IP_ADDRESS_PORT(pDestIp));
         CHK(FALSE, retStatus);
     }
@@ -1235,7 +1236,9 @@ STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pBuf, UINT32 
 
     if (STATUS_FAILED(retStatus)) {
         DLOGW("ice_utils_send failed with 0x%08x", retStatus);
-        retStatus = STATUS_SUCCESS;
+        if (retStatus != STATUS_SOCKET_CONN_CLOSED_ALREADY) {
+            retStatus = STATUS_SUCCESS;
+        }
     }
 
 CleanUp:
