@@ -67,10 +67,9 @@ int32_t http_parser_addRequiredHeader(struct list_head* head, char* field, UINT3
 
 void http_parser_deleteAllHeader(struct list_head* head)
 {
-    struct list_head* listptr;
+    struct list_head* listptr, *tmp;
     PHttpField node;
-
-    list_for_each(listptr, head)
+    list_for_each_safe(listptr, tmp, head)
     {
         node = list_entry(listptr, HttpField, list);
         SAFE_MEMFREE(node);
