@@ -11,6 +11,11 @@ mbedtls_ssl_srtp_profile DTLS_SRTP_SUPPORTED_PROFILES[] = {
     MBEDTLS_TLS_SRTP_UNSET,
 };
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+static mbedtls_ctr_drbg_context ctr_drbg;
+static mbedtls_entropy_context entropy;
+#endif
+
 STATUS dtls_session_create(PDtlsSessionCallbacks pDtlsSessionCallbacks, TIMER_QUEUE_HANDLE timerQueueHandle, INT32 certificateBits,
                            BOOL generateRSACertificate, PRtcCertificate pRtcCertificates, PDtlsSession* ppDtlsSession)
 {
@@ -231,8 +236,39 @@ CleanUp:
     return retStatus;
 }
 
-INT32 dtls_session_deriveKeyCallback(PVOID customData, const unsigned char* pMasterSecret, const unsigned char* pKeyBlock, ULONG maclen, ULONG keylen,
-                                     ULONG ivlen, const unsigned char clientRandom[MAX_DTLS_RANDOM_BYTES_LEN],
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+void dtls_session_deriveKeyCallback(void *customData,
+                                    mbedtls_ssl_key_export_type secret_type,
+                                    const unsigned char *pMasterSecret,
+                                    size_t pMasterSecretLen,
+                                    const unsigned char clientRandom[MAX_DTLS_RANDOM_BYTES_LEN],
+                                    const unsigned char serverRandom[MAX_DTLS_RANDOM_BYTES_LEN],
+                                    mbedtls_tls_prf_types tlsProfile)
+{
+    ENTERS();
+
+    /* We're only interested in the TLS 1.2 master secret */
+    if (secret_type != MBEDTLS_SSL_KEY_EXPORT_TLS12_MASTER_SECRET) {
+        printf("Secret type is not matching...\n");
+    }
+
+    PDtlsSession pDtlsSession = (PDtlsSession) customData;
+    PTlsKeys pKeys = &pDtlsSession->tlsKeys;
+
+    if (pMasterSecretLen != sizeof(pKeys->masterSecret)) {
+        printf("Length check failed, pMasterSecretLen = %d, sizeof(pKeys->masterSecret) = %d\n",
+               pMasterSecretLen,  sizeof(pKeys->masterSecret));
+    }
+
+    MEMCPY(pKeys->masterSecret, pMasterSecret, pMasterSecretLen);
+    MEMCPY(pKeys->randBytes, clientRandom, MAX_DTLS_RANDOM_BYTES_LEN);
+    MEMCPY(pKeys->randBytes + MAX_DTLS_RANDOM_BYTES_LEN, serverRandom, MAX_DTLS_RANDOM_BYTES_LEN);
+    pKeys->tlsProfile = tlsProfile;
+    LEAVES();
+}
+#else
+INT32 dtls_session_deriveKeyCallback(PVOID customData, const unsigned char* pMasterSecret, const unsigned char* pKeyBlock, ULONG maclen,
+                                     ULONG keylen, ULONG ivlen, const unsigned char clientRandom[MAX_DTLS_RANDOM_BYTES_LEN],
                                      const unsigned char serverRandom[MAX_DTLS_RANDOM_BYTES_LEN], mbedtls_tls_prf_types tlsProfile)
 {
     ENTERS();
@@ -249,6 +285,7 @@ INT32 dtls_session_deriveKeyCallback(PVOID customData, const unsigned char* pMas
     LEAVES();
     return 0;
 }
+#endif
 
 STATUS dtls_session_start(PDtlsSession pDtlsSession, BOOL isServer)
 {
@@ -284,12 +321,16 @@ STATUS dtls_session_start(PDtlsSession pDtlsSession, BOOL isServer)
     mbedtls_ssl_conf_dtls_cookies(&pDtlsSession->sslCtxConfig, NULL, NULL, NULL);
     CHK(mbedtls_ssl_conf_dtls_srtp_protection_profiles(&pDtlsSession->sslCtxConfig, DTLS_SRTP_SUPPORTED_PROFILES) == 0,
         STATUS_DTLS_CREATE_SSL_FAILED);
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
     mbedtls_ssl_conf_export_keys_ext_cb(&pDtlsSession->sslCtxConfig, (mbedtls_ssl_export_keys_ext_t*) dtls_session_deriveKeyCallback, pDtlsSession);
-
+#endif
     CHK(mbedtls_ssl_setup(&pDtlsSession->sslCtx, &pDtlsSession->sslCtxConfig) == 0, STATUS_DTLS_SSL_CTX_CREATION_FAILED);
     mbedtls_ssl_set_mtu(&pDtlsSession->sslCtx, DEFAULT_MTU_SIZE);
     mbedtls_ssl_set_bio(&pDtlsSession->sslCtx, pDtlsSession, (mbedtls_ssl_send_t*) dtls_session_sendCallback,
                         (mbedtls_ssl_recv_t*) dtls_session_receiveCallback, NULL);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    mbedtls_ssl_set_export_keys_cb(&pDtlsSession->sslCtx, dtls_session_deriveKeyCallback, pDtlsSession);
+#endif
     mbedtls_ssl_set_timer_cb(&pDtlsSession->sslCtx, &pDtlsSession->transmissionTimer, (mbedtls_ssl_set_timer_t*) dtls_session_setTimerCallback,
                              (mbedtls_ssl_get_timer_t*) dtls_session_getTimerCallback);
 
@@ -362,7 +403,11 @@ STATUS dtls_session_read(PDtlsSession pDtlsSession, PBYTE pData, PINT32 pDataLen
         }
     }
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    if (pDtlsSession->sslCtx.MBEDTLS_PRIVATE(state) == MBEDTLS_SSL_HANDSHAKE_OVER) {
+#else
     if (pDtlsSession->sslCtx.state == MBEDTLS_SSL_HANDSHAKE_OVER) {
+#endif
         CHK_STATUS(dtls_session_changeState(pDtlsSession, RTC_DTLS_TRANSPORT_STATE_CONNECTED));
     }
 
@@ -503,7 +548,11 @@ STATUS dtls_session_populateKeyingMaterial(PDtlsSession pDtlsSession, PDtlsKeyin
     MEMCPY(pDtlsKeyingMaterial->serverWriteKey + MAX_SRTP_MASTER_KEY_LEN, &keyingMaterialBuffer[offset], MAX_SRTP_SALT_KEY_LEN);
 
     mbedtls_ssl_get_dtls_srtp_negotiation_result(&pDtlsSession->sslCtx, &negotiatedSRTPProfile);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    switch (negotiatedSRTPProfile.MBEDTLS_PRIVATE(chosen_dtls_srtp_profile)) {
+#else
     switch (negotiatedSRTPProfile.chosen_dtls_srtp_profile) {
+#endif
         case MBEDTLS_TLS_SRTP_AES128_CM_HMAC_SHA1_80:
             pDtlsKeyingMaterial->srtpProfile = KVS_SRTP_PROFILE_AES128_CM_HMAC_SHA1_80;
             break;
@@ -518,6 +567,7 @@ CleanUp:
     if (locked) {
         MUTEX_UNLOCK(pDtlsSession->nestedDtlsLock);
     }
+    CHK_LOG_ERR(retStatus);
 
     LEAVES();
     return retStatus;
@@ -559,15 +609,35 @@ STATUS certificate_key_copy(mbedtls_x509_crt* pCert, mbedtls_pk_context* pKey, P
     BOOL initialized = FALSE;
     mbedtls_ecp_keypair *pSrcECP, *pDstECP;
 
+    int ret = 0;
+#if (MBEDTLS_VERSION_NUMBER >= 0x03000000)
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    int mbedtls_ctr_ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+    if (mbedtls_ctr_ret != 0) {
+        printf("mbedtls_ctr_drbg_seed failed\n");
+        goto CleanUp;
+    }
+#endif
+
     CHK(pCert != NULL && pKey != NULL && pDst != NULL, STATUS_DTLS_NULL_ARG);
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
     CHK(mbedtls_pk_check_pair(&pCert->pk, pKey) == 0, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#else
+    ret = mbedtls_pk_check_pair(&pCert->pk, pKey, mbedtls_ctr_drbg_random, &ctr_drbg);
+    CHK(ret == 0, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#endif
 
     mbedtls_x509_crt_init(&pDst->cert);
     mbedtls_pk_init(&pDst->privateKey);
     initialized = TRUE;
 
     CHK(mbedtls_x509_crt_parse_der(&pDst->cert, pCert->raw.p, pCert->raw.len) == 0, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
     CHK(mbedtls_pk_setup(&pDst->privateKey, pKey->pk_info) == 0, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#else
+    CHK(mbedtls_pk_setup(&pDst->privateKey, pKey->MBEDTLS_PRIVATE(pk_info)) == 0, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#endif
 
     switch (mbedtls_pk_get_type(pKey)) {
         case MBEDTLS_PK_RSA:
@@ -577,9 +647,16 @@ STATUS certificate_key_copy(mbedtls_x509_crt* pCert, mbedtls_pk_context* pKey, P
         case MBEDTLS_PK_ECDSA:
             pSrcECP = mbedtls_pk_ec(*pKey);
             pDstECP = mbedtls_pk_ec(pDst->privateKey);
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
             CHK(mbedtls_ecp_group_copy(&pDstECP->grp, &pSrcECP->grp) == 0 && mbedtls_ecp_copy(&pDstECP->Q, &pSrcECP->Q) == 0 &&
                     mbedtls_mpi_copy(&pDstECP->d, &pSrcECP->d) == 0,
                 STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#else
+            CHK(mbedtls_ecp_group_copy(&pDstECP->MBEDTLS_PRIVATE(grp), &pSrcECP->MBEDTLS_PRIVATE(grp)) == 0 &&
+                    mbedtls_ecp_copy(&pDstECP->MBEDTLS_PRIVATE(Q), &pSrcECP->MBEDTLS_PRIVATE(Q)) == 0 &&
+                    mbedtls_mpi_copy(&pDstECP->MBEDTLS_PRIVATE(d), &pSrcECP->MBEDTLS_PRIVATE(d)) == 0,
+                STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
+#endif
             break;
         default:
             CHK(FALSE, STATUS_DTLS_CERTIFICATE_GENERATION_FAILED);
@@ -595,6 +672,30 @@ CleanUp:
     LEAVES();
     return retStatus;
 }
+
+#if !(defined(MBEDTLS_BIGNUM_C) && !defined(MBEDTLS_DEPRECATED_REMOVED))
+int mbedtls_x509write_crt_set_serial(mbedtls_x509write_cert *ctx,
+                                     const mbedtls_mpi *serial)
+{
+    int ret;
+    size_t tmp_len;
+
+    /* Ensure that the MPI value fits into the buffer */
+    tmp_len = mbedtls_mpi_size(serial);
+    if (tmp_len > MBEDTLS_X509_RFC5280_MAX_SERIAL_LEN) {
+        return MBEDTLS_ERR_X509_BAD_INPUT_DATA;
+    }
+
+    ctx->MBEDTLS_PRIVATE(serial_len) = tmp_len;
+
+    ret = mbedtls_mpi_write_binary(serial, ctx->MBEDTLS_PRIVATE(serial), tmp_len);
+    if (ret < 0) {
+        return ret;
+    }
+
+    return 0;
+}
+#endif // MBEDTLS_BIGNUM_C && !MBEDTLS_DEPRECATED_REMOVED
 
 /**
  * certificate_key_create generates a new certificate and a key
@@ -728,7 +829,11 @@ STATUS dtls_session_calculateCertificateFingerprint(mbedtls_x509_crt* pCert, PCH
     pMdInfo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     CHK(pMdInfo != NULL, STATUS_INTERNAL_ERROR);
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    sslRet = mbedtls_sha256(pCert->raw.p, pCert->raw.len, fingerprint, 0);
+#else
     sslRet = mbedtls_sha256_ret(pCert->raw.p, pCert->raw.len, fingerprint, 0);
+#endif
     CHK(sslRet == 0, STATUS_INTERNAL_ERROR);
 
     size = mbedtls_md_get_size(pMdInfo);

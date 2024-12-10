@@ -240,9 +240,20 @@ INT32 dtls_session_sendCallback(PVOID, const unsigned char*, ULONG);
 INT32 dtls_session_receiveCallback(PVOID, unsigned char*, ULONG);
 VOID dtls_session_setTimerCallback(PVOID, UINT32, UINT32);
 INT32 dtls_session_getTimerCallback(PVOID);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+void dtls_session_deriveKeyCallback(void *customData,
+                                    mbedtls_ssl_key_export_type secret_type,
+                                    const unsigned char *pMasterSecret,
+                                    size_t pMasterSecretLen,
+                                    const unsigned char clientRandom[MAX_DTLS_RANDOM_BYTES_LEN],
+                                    const unsigned char serverRandom[MAX_DTLS_RANDOM_BYTES_LEN],
+                                    mbedtls_tls_prf_types tlsProfile);
+#else
 INT32 dtls_session_deriveKeyCallback(PVOID, const unsigned char*, const unsigned char*, ULONG, ULONG, ULONG,
                                      const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN], const unsigned char[MAX_DTLS_RANDOM_BYTES_LEN],
                                      mbedtls_tls_prf_types);
+#endif
+
 #else
 #error "A Crypto implementation is required."
 #endif

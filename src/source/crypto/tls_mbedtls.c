@@ -174,8 +174,11 @@ STATUS tls_session_read(PTlsSession pTlsSession, PBYTE pData, UINT32 bufferLen, 
             iterate = FALSE;
         }
     }
-
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    if (pTlsSession->sslCtx.MBEDTLS_PRIVATE(state) == MBEDTLS_SSL_HANDSHAKE_OVER) {
+#else
     if (pTlsSession->sslCtx.state == MBEDTLS_SSL_HANDSHAKE_OVER) {
+#endif
         tls_session_changeState(pTlsSession, TLS_SESSION_STATE_CONNECTED);
     }
 
