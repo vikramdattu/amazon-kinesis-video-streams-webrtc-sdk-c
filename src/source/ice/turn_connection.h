@@ -41,20 +41,18 @@ extern "C" {
 // The Permission Lifetime MUST be 300 seconds (= 5 minutes).
 // https://tools.ietf.org/html/rfc5766#section-8
 #define TURN_PERMISSION_LIFETIME                 (300 * HUNDREDS_OF_NANOS_IN_A_SECOND)
-#define DEFAULT_TURN_TIMER_INTERVAL_BEFORE_READY (50 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND) //!< 150ms
+#define DEFAULT_TURN_TIMER_INTERVAL_BEFORE_READY (50 * HUNDREDS_OF_NANOS_IN_A_MILLISECOND)
 #define DEFAULT_TURN_TIMER_INTERVAL_AFTER_READY  (1 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define DEFAULT_TURN_SEND_REFRESH_INVERVAL       (1 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
 // turn state timeouts
 #define DEFAULT_TURN_SOCKET_CONNECT_TIMEOUT    (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define DEFAULT_TURN_GET_CREDENTIAL_TIMEOUT    (10 * HUNDREDS_OF_NANOS_IN_A_SECOND)
-#define DEFAULT_TURN_ALLOCATION_TIMEOUT        (10 * HUNDREDS_OF_NANOS_IN_A_SECOND) //!< 5 sec
-#define DEFAULT_TURN_CREATE_PERMISSION_TIMEOUT (10 * HUNDREDS_OF_NANOS_IN_A_SECOND) //!< 2 sec
-#define DEFAULT_TURN_BIND_CHANNEL_TIMEOUT      (10 * HUNDREDS_OF_NANOS_IN_A_SECOND) //!< 3 sec
-#define DEFAULT_TURN_CLEAN_UP_TIMEOUT          (10 * HUNDREDS_OF_NANOS_IN_A_SECOND) //!< 10 sec
+#define DEFAULT_TURN_ALLOCATION_TIMEOUT        (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define DEFAULT_TURN_CREATE_PERMISSION_TIMEOUT (2 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define DEFAULT_TURN_BIND_CHANNEL_TIMEOUT      (3 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+#define DEFAULT_TURN_CLEAN_UP_TIMEOUT          (10 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
-// #TBD, It is suggested that the client refresh the allocation roughly 1 minute before it expires.
-// https://tools.ietf.org/html/rfc5766#section-7
 #define DEFAULT_TURN_ALLOCATION_REFRESH_GRACE_PERIOD (30 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 #define DEFAULT_TURN_PERMISSION_REFRESH_GRACE_PERIOD (30 * HUNDREDS_OF_NANOS_IN_A_SECOND)
 
@@ -62,13 +60,9 @@ extern "C" {
 #define DEFAULT_TURN_MESSAGE_SEND_CHANNEL_DATA_BUFFER_LEN MAX_TURN_CHANNEL_DATA_MESSAGE_SIZE
 #define DEFAULT_TURN_MESSAGE_RECV_CHANNEL_DATA_BUFFER_LEN MAX_TURN_CHANNEL_DATA_MESSAGE_SIZE
 #define DEFAULT_TURN_CHANNEL_DATA_BUFFER_SIZE             512
-#define DEFAULT_TURN_MAX_PEER_COUNT                       32 //!<
+#define DEFAULT_TURN_MAX_PEER_COUNT                       32
 
 // all turn channel numbers must be greater than 0x4000 and less than 0x7FFF
-// 0x0000 through 0x3FFF: These values can never be used for channel numbers.
-// 0x4000 through 0x7FFF: These values are the allowed channel numbers (16,383 possible values).
-// 0x8000 through 0xFFFF: These values are reserved for future use.
-// https://tools.ietf.org/html/rfc5766#section-11
 #define TURN_CHANNEL_BIND_CHANNEL_NUMBER_BASE (UINT16) 0x4000
 
 // 2 byte channel number 2 data byte size
@@ -87,6 +81,7 @@ extern "C" {
 #define TURN_STATE_UNKNOWN_STR                 (PCHAR) "TURN_STATE_UNKNOWN"
 
 typedef STATUS (*RelayAddressAvailableFunc)(UINT64, PKvsIpAddress, PSocketConnection);
+
 /**
  * @brief   the state of local turn connection.
  */
@@ -116,10 +111,10 @@ typedef enum {
     TURN_CONNECTION_DATA_TRANSFER_MODE_SEND_INDIDATION, //!< https://tools.ietf.org/html/rfc5766#section-2.4
     TURN_CONNECTION_DATA_TRANSFER_MODE_DATA_CHANNEL,    //!< https://tools.ietf.org/html/rfc5766#section-2.5
 } TURN_CONNECTION_DATA_TRANSFER_MODE;
-// 4+4+24=32
+
 typedef struct {
-    PBYTE data;  //!< the pointer of the buffer.
-    UINT32 size; //!<
+    PBYTE data;
+    UINT32 size;
     KvsIpAddress senderAddr;
 } TurnChannelData, *PTurnChannelData;
 
@@ -142,7 +137,6 @@ typedef struct {
     UINT16 channelNumber;
     UINT64 permissionExpirationTime;
     BOOL ready;
-    UINT64 rto;
 } TurnPeer, *PTurnPeer;
 
 typedef struct __TurnConnection TurnConnection;
@@ -150,7 +144,7 @@ struct __TurnConnection {
     volatile ATOMIC_BOOL stopTurnConnection;
     /* shutdown is complete when turn socket is closed */
     volatile ATOMIC_BOOL shutdownComplete;
-    volatile ATOMIC_BOOL hasAllocation; //!< get the allocation response of turn connection. It means we have the turn relay address.
+    volatile ATOMIC_BOOL hasAllocation;
     volatile SIZE_T timerCallbackId;
 
     // realm attribute in Allocation response
@@ -158,35 +152,34 @@ struct __TurnConnection {
     BYTE turnNonce[STUN_MAX_NONCE_LEN];
     UINT16 nonceLen;
     BYTE longTermKey[KVS_MD5_DIGEST_LENGTH];
-    BOOL credentialObtained;   //!< get the nonce and realm from 401 response. true: got the information.
-    BOOL relayAddressReported; //!< get the xor relay address.
+    BOOL credentialObtained;
+    BOOL relayAddressReported;
 
-    PSocketConnection pControlChannel; //!< the socket hanlder of this turn connection.
+    PSocketConnection pControlChannel;
 
-    TurnPeer turnPeerList[DEFAULT_TURN_MAX_PEER_COUNT]; //!< #TBD, need to review this. it should be reduced.
-                                                        //!< remote peers(remote ice candidates) for this turn connection.
-    UINT32 turnPeerCount;                               //!< the number of remote peers(remote ice candidates) for this turn connection.
+    TurnPeer turnPeerList[DEFAULT_TURN_MAX_PEER_COUNT];
+    UINT32 turnPeerCount;
 
     TIMER_QUEUE_HANDLE timerQueueHandle;
 
     IceServer turnServer;
 
-    MUTEX lock; //!< the lock of this context.
+    MUTEX lock;
     MUTEX sendLock;
     CVAR freeAllocationCvar;
 
-    TURN_CONNECTION_STATE turnFsmState; //!< the state of turn fsm.
+    TURN_CONNECTION_STATE state;
 
     UINT64 stateTimeoutTime;
 
     STATUS errorStatus;
-    // #TBD, need to review this is necessary or not, since turn does not send this packet frequently.
-    PStunPacket pTurnPacket;
-    PStunPacket pTurnCreatePermissionPacket;  //!< the packet of turn create-permission.
-    PStunPacket pTurnChannelBindPacket;       //!< the packet of turn bind-channel.
-    PStunPacket pTurnAllocationRefreshPacket; //!< the packet of refresh-allocation.
 
-    KvsIpAddress hostAddress; //!< the host address, but it seems to be null now. #TBD, need to check the spec.
+    PStunPacket pTurnPacket;
+    PStunPacket pTurnCreatePermissionPacket;
+    PStunPacket pTurnChannelBindPacket;
+    PStunPacket pTurnAllocationRefreshPacket;
+
+    KvsIpAddress hostAddress;
 
     KvsIpAddress relayAddress;
 
@@ -200,14 +193,14 @@ struct __TurnConnection {
     PBYTE sendDataBuffer;
     UINT32 dataBufferSize;
 
-    PBYTE recvDataBuffer;      //!<
-    UINT32 recvDataBufferSize; //!<
+    PBYTE recvDataBuffer;
+    UINT32 recvDataBufferSize;
     UINT32 currRecvDataLen;
     // when a complete channel data have been assembled in recvDataBuffer, move it to completeChannelDataBuffer
     // to make room for subsequent partial channel data.
     PBYTE completeChannelDataBuffer;
 
-    UINT64 allocationExpirationTime; //!< the expiration time of this turn allocation. unit: nano.
+    UINT64 allocationExpirationTime;
     UINT64 nextAllocationRefreshTime;
 
     UINT64 currentTimerCallingPeriod;
@@ -243,6 +236,7 @@ STATUS turn_connection_create(PIceServer pTurnServer, TIMER_QUEUE_HANDLE timerQu
  * @return STATUS status of execution.
  */
 STATUS turn_connection_free(PTurnConnection* ppTurnConnection);
+
 /**
  * @brief add remote peer to the turn connection.
  *
@@ -252,17 +246,19 @@ STATUS turn_connection_free(PTurnConnection* ppTurnConnection);
  * @return STATUS status of execution.
  */
 STATUS turn_connection_addPeer(PTurnConnection pTurnConnection, PKvsIpAddress pPeerAddress);
+
 /**
- * @brief add remote peer to the turn connection.
+ * @brief send data to the remote peer.
  *
  * @param[in] pTurnConnection the context of the turn connection.
- * @param[in] pBuf
- * @param[in] bufLen
- * @param[in] pDestIp
+ * @param[in] pData the data to send.
+ * @param[in] dataLen the length of the data to send.
+ * @param[in] pDestIp the ip address of the remote peer.
  *
  * @return STATUS status of execution.
  */
-STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pBuf, UINT32 bufLen, PKvsIpAddress pDestIp);
+STATUS turn_connection_send(PTurnConnection pTurnConnection, PBYTE pData, UINT32 dataLen, PKvsIpAddress pDestIp);
+
 /**
  * @brief start the turn connection.
  *
@@ -282,6 +278,10 @@ BOOL turn_connection_isShutdownCompleted(PTurnConnection);
  * @return STATUS status of execution.
  */
 BOOL turn_connection_getRelayAddress(PTurnConnection pTurnConnection, PKvsIpAddress pKvsIpAddress);
+STATUS turn_connection_refreshAllocation(PTurnConnection);
+STATUS turn_connection_refreshPermission(PTurnConnection, PBOOL);
+STATUS turnConnectionFreePreAllocatedPackets(PTurnConnection);
+
 /**
  * @brief advance the fsm of the turn connection.
  *
@@ -289,7 +289,13 @@ BOOL turn_connection_getRelayAddress(PTurnConnection pTurnConnection, PKvsIpAddr
  *
  * @return STATUS status of execution.
  */
-STATUS turn_connection_fsm_step(PTurnConnection pTurnConnection);
+STATUS turnConnectionStepState(PTurnConnection);
+STATUS turnConnectionUpdateNonce(PTurnConnection);
+STATUS turn_connection_fsmTimerCallback(UINT32, UINT64, UINT64);
+STATUS turnConnectionGetLongTermKey(PCHAR, PCHAR, PCHAR, PBYTE, UINT32);
+STATUS turnConnectionPackageTurnAllocationRequest(PCHAR, PCHAR, PBYTE, UINT16, UINT32, PStunPacket*);
+PCHAR turnConnectionGetStateStr(TURN_CONNECTION_STATE);
+
 /**
  * @brief parse the data from the socket connection, and split them into stun packets, and turn packets.
  *
@@ -305,6 +311,16 @@ STATUS turn_connection_fsm_step(PTurnConnection pTurnConnection);
  */
 STATUS turn_connection_handleInboundData(PTurnConnection pTurnConnection, PBYTE pBuffer, UINT32 bufferLen, PKvsIpAddress pSrc, PKvsIpAddress pDest,
                                          PTurnChannelData channelDataList, PUINT32 pChannelDataCount);
+
+STATUS turn_connection_handleInboundStun(PTurnConnection, PBYTE, UINT32);
+STATUS turn_connection_handleInboundStunError(PTurnConnection, PBYTE, UINT32);
+STATUS turn_connection_handleChannelData(PTurnConnection, PBYTE, UINT32, PTurnChannelData, PUINT32, PUINT32);
+STATUS turn_connection_handleTcpChannelData(PTurnConnection, PBYTE, UINT32, PTurnChannelData, PUINT32, PUINT32);
+VOID turn_connection_throwFatalError(PTurnConnection, STATUS);
+
+PTurnPeer turnConnectionGetPeerWithChannelNumber(PTurnConnection, UINT16);
+PTurnPeer turnConnectionGetPeerWithIp(PTurnConnection, PKvsIpAddress);
+
 #ifdef __cplusplus
 }
 #endif
