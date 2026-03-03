@@ -52,7 +52,9 @@ STATUS freeConnectionListener(PConnectionListener* ppConnectionListener)
     STATUS retStatus = STATUS_SUCCESS;
     PConnectionListener pConnectionListener = NULL;
     TID threadId;
+#if defined(HAVE_SOCKETPAIR)
     const char* msg = "1";
+#endif
 
     CHK(ppConnectionListener != NULL, STATUS_NULL_ARG);
     CHK(*ppConnectionListener != NULL, retStatus);
@@ -214,7 +216,14 @@ STATUS connectionListenerStart(PConnectionListener pConnectionListener)
     locked = TRUE;
 
     CHK(!IS_VALID_TID_VALUE(pConnectionListener->receiveDataRoutine), retStatus);
+#if CONFIG_IDF_CMAKE
+#define CONN_LISTENER_THREAD_STACK_SIZE (32 * 1024)
+    CHK_STATUS(THREAD_CREATE_EX_EXT(&pConnectionListener->receiveDataRoutine, "connListener",
+               CONN_LISTENER_THREAD_STACK_SIZE, TRUE, connectionListenerReceiveDataRoutine,
+               (PVOID) pConnectionListener));
+#else
     CHK_STATUS(THREAD_CREATE(&pConnectionListener->receiveDataRoutine, connectionListenerReceiveDataRoutine, (PVOID) pConnectionListener));
+#endif
 
 CleanUp:
 

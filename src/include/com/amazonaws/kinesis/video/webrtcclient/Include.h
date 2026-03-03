@@ -647,7 +647,7 @@ extern "C" {
 /**
  * Maximum length of SDP member in RtcSessionDescriptionInit
  */
-#define MAX_SESSION_DESCRIPTION_INIT_SDP_LEN 25000
+#define MAX_SESSION_DESCRIPTION_INIT_SDP_LEN 12000
 
 /**
  * Maximum length of a MediaStream's ID
@@ -822,12 +822,12 @@ extern "C" {
 /**
  * Default minimum number of threads in the threadpool for the SDK
  */
-#define THREADPOOL_MIN_THREADS 3
+#define THREADPOOL_MIN_THREADS 1
 
 /**
  * Default maximum number of threads in the threadpool for the SDK
  */
-#define THREADPOOL_MAX_THREADS 10
+#define THREADPOOL_MAX_THREADS 1
 
 /**
  * Env to set minimum number of threads in the threadpool for the KVS SDK
@@ -1511,6 +1511,21 @@ typedef struct {
 } RtcIceCandidateInit, *PRtcIceCandidateInit;
 
 /**
+ * @brief Define this macro to use dynamically allocated payload in SignalingMessage
+ * This can be useful for platforms with limited memory as it avoids allocating
+ * MAX_SIGNALING_MESSAGE_LEN for each message when only a small payload is needed
+ */
+
+/**
+ * @brief If PREFER_DYNAMIC_ALLOCS is set to 1, use dynamic allocation for signaling payload
+ * Otherwise, use the existing DYNAMIC_SIGNALING_PAYLOAD setting
+ */
+#if PREFER_DYNAMIC_ALLOCS
+#define DYNAMIC_SIGNALING_PAYLOAD 1
+#define USE_DYNAMIC_URL 1
+#endif
+
+/**
  * @brief Structure defining the basic signaling message
  */
 typedef struct {
@@ -1524,7 +1539,11 @@ typedef struct {
 
     UINT32 payloadLen; //!< Optional payload length. If 0, the length will be calculated
 
+#ifdef DYNAMIC_SIGNALING_PAYLOAD
+    PCHAR payload; //!< Actual signaling message payload - dynamically allocated
+#else
     CHAR payload[MAX_SIGNALING_MESSAGE_LEN + 1]; //!< Actual signaling message payload
+#endif
 } SignalingMessage, *PSignalingMessage;
 
 /**
@@ -2370,6 +2389,16 @@ PUBLIC_API STATUS freeSignalingClient(PSIGNALING_CLIENT_HANDLE);
  * @return STATUS code of the execution. STATUS_SUCCESS on success
  */
 PUBLIC_API STATUS signalingClientSendMessageSync(SIGNALING_CLIENT_HANDLE, PSignalingMessage);
+
+/**
+ * @brief Releases the (possibly dynamically allocated) payload of a
+ * SignalingMessage / ReceivedSignalingMessage out-param.
+ *
+ * Safe to call with a NULL pMessage.
+ *
+ * @param[in,out] pMessage SignalingMessage whose payload should be released.
+ */
+PUBLIC_API VOID freeSignalingMessagePayload(PSignalingMessage pMessage);
 
 /**
  * @brief Gets the retrieved ICE configuration information object count
