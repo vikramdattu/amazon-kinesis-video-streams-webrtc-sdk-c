@@ -125,11 +125,20 @@ $env:Path += ';C:\webrtc\open-source\bin;C:\tools\pthreads-w32-2-9-1-release\Pre
 ### Dependency requirements
 
 These would be applicable if the SDK is being linked with system dependencies instead of building from source by the SDK.
-`libmbedtls`: `>= 2.25.0 & < 4.x.x`
+
+`libmbedtls`: `>= 2.25.0` (default: 3.6.x — see mbedTLS build matrix below)
 `libopenssl`: `= 1.1.1x`
 `libsrtp2` : `<= 2.5.0`
 `libusrsctp` : `<= 0.9.5.0`
 `libwebsockets` : `>= 4.2.0`
+
+#### mbedTLS build matrix
+
+| mbedTLS line | Default | Opt-in flag | Notes |
+|---|---|---|---|
+| 2.28.x | — | `-DBUILD_OLD_MBEDTLS_VERSION=ON` | Legacy |
+| **3.6.x** | **Yes** | (default) | |
+| 4.x | — | `-DUSE_MBEDTLS4=ON` | Implies `-DUSE_LIBSRTP3=ON` |
 
 #### Cross-Compilation
 
