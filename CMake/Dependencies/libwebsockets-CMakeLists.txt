@@ -28,9 +28,34 @@ endif()
 
 ExternalProject_Add(project_libwebsockets
     GIT_REPOSITORY    https://github.com/warmcat/libwebsockets.git
-    GIT_TAG           v4.3.10
+    # TODO: revert this set of workarounds once warmcat cuts a release that
+    # includes the mbedtls4 migration. Current state:
+    #   - SHA pin to main 7726361 (post-mbedtls4-migration: 3079d311 + sai-fixes)
+    #   - GIT_SHALLOW FALSE because the SHA is not a branch tip / tag
+    #   - GIT_SUBMODULES "README.md" sidesteps broken qpack/qifs gitlink that
+    #     has no .gitmodules URL entry (tracked: warmcat upstream PR pending,
+    #     see esp-rainmaker task #130)
+    #   - LWS_ROLE_QUIC=OFF / LWS_WITH_HTTP3=OFF skip in-flight features that
+    #     don't compile cleanly (tracked: warmcat upstream PR pending,
+    #     see esp-rainmaker task #131)
+    # v4.5.8 (latest release tag) predates the mbedtls4 migration. Revert to
+    # GIT_TAG vX.Y.Z + GIT_SHALLOW TRUE + drop GIT_SUBMODULES + drop the
+    # LWS_ROLE_QUIC/LWS_WITH_HTTP3 lines once the upstream release ships.
+    GIT_TAG           7726361cf453ec7bb83eb33ec6d5f468219c1c4d
     GIT_PROGRESS      TRUE
-    GIT_SHALLOW       TRUE
+    # GIT_SHALLOW FALSE because the SHA above is not currently a branch tip on
+    # warmcat/libwebsockets:main. Depth-1 clone would fail with "reference is
+    # not a tree". Trade-off: ~80 MB full clone vs reproducibility of the
+    # pinned SHA. Revert to TRUE once a release tag carrying the mbedtls4
+    # migration ships.
+    GIT_SHALLOW       FALSE
+    # Skip libwebsockets's nested submodules — KVS doesn't use the example /
+    # test data, and recent main SHAs commit the api-test-qpack/qifs gitlink
+    # without a corresponding .gitmodules URL entry which breaks recursive
+    # submodule init. Point GIT_SUBMODULES at an existing non-submodule path
+    # (README.md) so `git submodule update --init -- <path>` is a no-op on
+    # CMake versions where the empty-list form doesn't take.
+    GIT_SUBMODULES    "README.md"
     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
     LIST_SEPARATOR    |
     CMAKE_ARGS
@@ -39,6 +64,8 @@ ExternalProject_Add(project_libwebsockets
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DDISABLE_WERROR=ON
         -DLWS_WITH_HTTP2=1
+        -DLWS_ROLE_QUIC=OFF
+        -DLWS_WITH_HTTP3=OFF
         -DLWS_HAVE_HMAC_CTX_new=1
         -DLWS_HAVE_SSL_EXTRA_CHAIN_CERTS=1
         -DLWS_HAVE_OPENSSL_ECDH_H=1
