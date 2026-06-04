@@ -35,15 +35,43 @@ extern "C" {
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 #elif KVS_USE_MBEDTLS
+/* mbedTLS 4 moved legacy entropy/CTR-DRBG/hash/RSA/ECP/bignum headers under
+ * mbedtls/private/ and gates their prototypes behind
+ * MBEDTLS_DECLARE_PRIVATE_IDENTIFIERS. The symbols still ship in libmbedcrypto,
+ * so we declare the macro before mbedtls/ssl.h to re-expose them across all
+ * includes below. Note: mbedtls/private/* is explicitly unsupported upstream
+ * and may break across v4.x point releases. TODO: migrate to PSA Crypto APIs
+ * (psa_crypto_init + psa_generate_random + psa_hash_compute + psa_mac_compute)
+ * in a follow-up so we can drop this opt-out. */
+#if defined(__has_include) && __has_include(<mbedtls/build_info.h>)
+#include <mbedtls/build_info.h>
+#else
+#include <mbedtls/version.h>
+#endif
+#if defined(MBEDTLS_VERSION_NUMBER) && MBEDTLS_VERSION_MAJOR >= 4
+#define MBEDTLS_DECLARE_PRIVATE_IDENTIFIERS
+#endif
 #include <mbedtls/ssl.h>
+#include <mbedtls/error.h>
+#if defined(MBEDTLS_VERSION_NUMBER) && MBEDTLS_VERSION_MAJOR >= 4
+#include <mbedtls/private/entropy.h>
+#include <mbedtls/private/ctr_drbg.h>
+#include <mbedtls/private/sha256.h>
+#include <mbedtls/private/md5.h>
+#include <mbedtls/md.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/private/rsa.h>
+#include <mbedtls/private/ecp.h>
+#include <mbedtls/private/bignum.h>
+#else
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
-#include <mbedtls/error.h>
 #if MBEDTLS_VERSION_NUMBER < 0x03000000
 #include <mbedtls/certs.h>
 #endif
 #include <mbedtls/sha256.h>
 #include <mbedtls/md5.h>
+#endif
 #endif
 
 #ifdef USE_LIBSRTP3

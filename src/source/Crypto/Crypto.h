@@ -43,9 +43,19 @@ typedef enum {
 #define KVS_SHA1_HMAC(k, klen, m, mlen, ob, plen)                                                                                                    \
     CHK(0 == mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA1), (k), (klen), (m), (mlen), (ob)), STATUS_HMAC_GENERATION_ERROR);             \
     *(plen) = mbedtls_md_get_size(mbedtls_md_info_from_type(MBEDTLS_MD_SHA1));
+#if MBEDTLS_VERSION_MAJOR >= 4
+/* PSA Crypto must be initialised before any psa_* call. psa_crypto_init() is
+ * idempotent; calling it once from the SDK init path avoids the per-session
+ * race on builds without MBEDTLS_THREADING_C. */
+#define KVS_CRYPTO_INIT()                                                                                                                            \
+    do {                                                                                                                                             \
+        (void) psa_crypto_init();                                                                                                                    \
+    } while (0)
+#else
 #define KVS_CRYPTO_INIT()                                                                                                                            \
     do {                                                                                                                                             \
     } while (0)
+#endif
 #define LOG_MBEDTLS_ERROR(s, ret)                                                                                                                    \
     do {                                                                                                                                             \
         CHAR __mbedtlsErr[1024];                                                                                                                     \
