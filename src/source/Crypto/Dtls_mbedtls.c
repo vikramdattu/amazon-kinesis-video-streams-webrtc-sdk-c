@@ -829,13 +829,15 @@ STATUS copyCertificateAndKey(mbedtls_x509_crt* pCert, mbedtls_pk_context* pKey, 
         BOOL keyWrapped = FALSE;
 
         CHK(psa_crypto_init() == PSA_SUCCESS, STATUS_CERTIFICATE_GENERATION_FAILED);
-        /* Match createCertificateAndKey's policy: both SIGN_HASH and SIGN_MESSAGE.
-         * The source key must have PSA_KEY_USAGE_EXPORT for mbedtls_pk_import_into_psa
-         * to succeed — a hardened caller-provided key without EXPORT will fail here. */
-        if (mbedtls_pk_get_psa_attributes(pKey, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE, &attr) != 0) {
-            DLOGE("mbedtls_pk_get_psa_attributes failed; the source key may lack PSA_KEY_USAGE_EXPORT");
+        /* mbedtls_pk_get_psa_attributes takes a SINGLE usage enum (its switch
+         * rejects OR'd flags with PK_TYPE_MISMATCH) and internally adds
+         * EXPORT|COPY. Derive from SIGN_HASH, then add SIGN_MESSAGE so the clone
+         * matches createCertificateAndKey's policy (v3 prehash + v1.3 message). */
+        if (mbedtls_pk_get_psa_attributes(pKey, PSA_KEY_USAGE_SIGN_HASH, &attr) != 0) {
+            DLOGE("mbedtls_pk_get_psa_attributes failed");
             CHK(FALSE, STATUS_CERTIFICATE_GENERATION_FAILED);
         }
+        psa_set_key_usage_flags(&attr, psa_get_key_usage_flags(&attr) | PSA_KEY_USAGE_SIGN_MESSAGE);
         psaStatus = mbedtls_pk_import_into_psa(pKey, &attr, &newKeyId);
         if (psaStatus != 0) {
             DLOGE("mbedtls_pk_import_into_psa failed (status %d); source key likely lacks PSA_KEY_USAGE_EXPORT", (int) psaStatus);
@@ -953,16 +955,18 @@ STATUS createCertificateAndKey(INT32 certificateBits, BOOL generateRSACertificat
     initialized = TRUE;
 
     /* SIGN_HASH + SIGN_MESSAGE covers both v3 prehash and v1.3 message-signing
-     * code paths. EXPORT/COPY are intentionally not set on this ephemeral key. */
+     * code paths. EXPORT is required so copyCertificateAndKey() can clone this
+     * pre-generated key into each DTLS session via mbedtls_pk_import_into_psa();
+     * the key is an ephemeral self-signed cert that never leaves the process. */
     if (generateRSACertificate) {
         psa_set_key_type(&keyAttr, PSA_KEY_TYPE_RSA_KEY_PAIR);
         psa_set_key_bits(&keyAttr, (size_t) certificateBits);
-        psa_set_key_usage_flags(&keyAttr, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE);
+        psa_set_key_usage_flags(&keyAttr, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE | PSA_KEY_USAGE_EXPORT);
         psa_set_key_algorithm(&keyAttr, PSA_ALG_RSA_PKCS1V15_SIGN(PSA_ALG_ANY_HASH));
     } else {
         psa_set_key_type(&keyAttr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
         psa_set_key_bits(&keyAttr, 256);
-        psa_set_key_usage_flags(&keyAttr, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE);
+        psa_set_key_usage_flags(&keyAttr, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE | PSA_KEY_USAGE_EXPORT);
         /* MBEDTLS_PK_ALG_ECDSA resolves to deterministic ECDSA when available
          * (the v4 default for TLS); set the enrollment alg to plain ECDSA so
          * the key matches both flavours during ssl_pick_cert. */
