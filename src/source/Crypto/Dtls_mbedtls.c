@@ -168,13 +168,20 @@ STATUS createDtlsSessionWithOptions(PDtlsSessionCallbacks pDtlsSessionCallbacks,
     CHK(pDtlsSession != NULL, STATUS_NOT_ENOUGH_MEMORY);
 
     // initialize mbedtls stuff with sane values
+#if !MBEDTLS_V4_OR_LATER
+    /* mbedTLS 4 removes the entropy/ctr_drbg one-shot API — PSA Crypto owns the
+     * RNG (mbedtls_ssl_conf_rng is gated off too, and copyCertificateAndKey
+     * UNUSED_PARAMs the drbg on v4). */
     mbedtls_entropy_init(&pDtlsSession->entropy);
     mbedtls_ctr_drbg_init(&pDtlsSession->ctrDrbg);
+#endif
     mbedtls_ssl_config_init(&pDtlsSession->sslCtxConfig);
     mbedtls_ssl_init(&pDtlsSession->sslCtx);
     mbedtls_x509_crt_init(&pDtlsSession->trustedCaCert);
+#if !MBEDTLS_V4_OR_LATER
     mbedtls_ctr_drbg_set_prediction_resistance(&pDtlsSession->ctrDrbg, MBEDTLS_CTR_DRBG_PR_ON);
     CHK(mbedtls_ctr_drbg_seed(&pDtlsSession->ctrDrbg, mbedtls_entropy_func, &pDtlsSession->entropy, NULL, 0) == 0, STATUS_CREATE_SSL_FAILED);
+#endif
 
     CHK_STATUS(createIOBuffer(DEFAULT_MTU_SIZE_BYTES, &pDtlsSession->pReadBuffer));
     pDtlsSession->timerQueueHandle = timerQueueHandle;
@@ -242,8 +249,10 @@ STATUS freeDtlsSession(PDtlsSession* ppDtlsSession)
         freeCertificateAndKey(&pCertInfo->cert, &pCertInfo->privateKey);
     }
     mbedtls_x509_crt_free(&pDtlsSession->trustedCaCert);
+#if !MBEDTLS_V4_OR_LATER
     mbedtls_entropy_free(&pDtlsSession->entropy);
     mbedtls_ctr_drbg_free(&pDtlsSession->ctrDrbg);
+#endif
     mbedtls_ssl_config_free(&pDtlsSession->sslCtxConfig);
     mbedtls_ssl_free(&pDtlsSession->sslCtx);
 

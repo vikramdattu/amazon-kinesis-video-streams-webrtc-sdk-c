@@ -35,7 +35,11 @@ typedef enum {
 #define KVS_RSA_F4             0x10001L
 #define KVS_MD5_DIGEST_LENGTH  16
 #define KVS_SHA1_DIGEST_LENGTH 20
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#if MBEDTLS_VERSION_MAJOR >= 4
+/* mbedTLS 4 drops the one-shot mbedtls_md5(); route through the generic md API
+ * (same pattern as KVS_SHA1_HMAC below). */
+#define KVS_MD5_DIGEST(m, mlen, ob) mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_MD5), (m), (mlen), (ob));
+#elif MBEDTLS_VERSION_NUMBER >= 0x03000000
 #define KVS_MD5_DIGEST(m, mlen, ob) mbedtls_md5((m), (mlen), (ob));
 #else
 #define KVS_MD5_DIGEST(m, mlen, ob) mbedtls_md5_ret((m), (mlen), (ob));

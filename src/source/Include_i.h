@@ -39,7 +39,7 @@ extern "C" {
  * mbedtls/private/ and gates their prototypes behind
  * MBEDTLS_DECLARE_PRIVATE_IDENTIFIERS. The symbols still ship in libmbedcrypto,
  * so we declare the macro before mbedtls/ssl.h to re-expose them across all
- * includes below. Note: mbedtls/private/* is explicitly unsupported upstream
+ * includes below. Note: the mbedtls/private/ headers are explicitly unsupported upstream
  * and may break across v4.x point releases. TODO: migrate to PSA Crypto APIs
  * (psa_crypto_init + psa_generate_random + psa_hash_compute + psa_mac_compute)
  * in a follow-up so we can drop this opt-out. */
