@@ -162,7 +162,13 @@ STATUS createSignalingSync(PSignalingClientInfoInternal pClientInfo, PChannelInf
     CHK_STATUS(readCACertificate(pChannelInfo->pCertPath, &caCertBuf, &caCertBufLen));
     creationInfo.client_ssl_ca_mem = caCertBuf;
     creationInfo.client_ssl_ca_mem_len = caCertBufLen;
+#ifdef KVS_USE_MBEDTLS
+    // "HIGH:!PSK:..." is an OpenSSL cipher-category alias; lws's mbedTLS backend
+    // can't map it and fails vhost creation. NULL selects mbedTLS's defaults.
+    creationInfo.client_ssl_cipher_list = NULL;
+#else
     creationInfo.client_ssl_cipher_list = "HIGH:!PSK:!RSP:!eNULL:!aNULL:!RC4:!MD5:!DES:!3DES:!aDH:!kDH:!DSS";
+#endif
     creationInfo.ka_time = SIGNALING_SERVICE_TCP_KEEPALIVE_IN_SECONDS;
     creationInfo.ka_probes = SIGNALING_SERVICE_TCP_KEEPALIVE_PROBE_COUNT;
     creationInfo.ka_interval = SIGNALING_SERVICE_TCP_KEEPALIVE_PROBE_INTERVAL_IN_SECONDS;
